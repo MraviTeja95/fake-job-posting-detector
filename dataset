@@ -1,14 +1,7 @@
-# Dataset Information
+Dataset Information
 
-Source: Kaggle
+This project uses a fake job posting dataset.
 
-Dataset: Fake Job Postings Dataset
+The dataset contains job descriptions labeled as real or fake.
 
-Columns:
-- job_title
-- company_profile
-- description
-- requirements
-- fraudulent (0 = real job, 1 = fake job)
-
-This dataset will be used to train the machine learning model.
+It will be used to train a machine learning model.
