@@ -1,1 +1,14 @@
+# Dataset Information
 
+Source: Kaggle
+
+Dataset: Fake Job Postings Dataset
+
+Columns:
+- job_title
+- company_profile
+- description
+- requirements
+- fraudulent (0 = real job, 1 = fake job)
+
+This dataset will be used to train the machine learning model.
