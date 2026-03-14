@@ -13,4 +13,4 @@ AI system that detects fake job postings using NLP and Machine Learning.
 - Machine learning model
 - Web interface
 =======
->>>>>>> e16ff78ab6a2415971034e9a8c73e200d076beb5
+
