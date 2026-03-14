@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 pandas
 scikit-learn
 flask
 joblib
+=======
+
+>>>>>>> e16ff78ab6a2415971034e9a8c73e200d076beb5
