@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<title>AI Fake Job Detector</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>AI Fake Job Detector</h1>
+
+<p class="guide">
+Paste a job description OR LinkedIn profile link below.
+The AI system will analyse language patterns, hiring signals,
+and profile indicators to determine whether the job appears legitimate.
+</p>
+
+{% if not prediction %}
+
+<form method="POST" id="jobForm">
+
+<textarea name="job_input" placeholder="Paste job description or LinkedIn link here"></textarea>
+
+<button type="submit" id="analyzeBtn">Analyze</button>
+
+</form>
+
+{% endif %}
+
+<div id="loader" class="loader"></div>
+
+{% if prediction %}
+
+<div class="result {{ prediction|lower }}">
+
+<h3>Analysis Result</h3>
+
+Prediction : {{ prediction }} <br>
+Confidence : {{ confidence }}%
+
+</div>
+
+<div class="analysis">
+
+<h3>Fake Job Probability Meter</h3>
+
+<div class="meter">
+
+<div class="meter-bar" style="width: {{ risk }}%"></div>
+
+</div>
+
+<p>{{ risk }}% Scam Risk</p>
+
+</div>
+
+<button onclick="location.href='/'" class="back-btn">Back</button>
+
+{% endif %}
+
+{% if suggestions %}
+
+<div class="analysis">
+
+<h3>AI Safety Suggestions</h3>
+
+<ul>
+
+{% for s in suggestions %}
+
+<li>{{ s }}</li>
+
+{% endfor %}
+
+</ul>
+
+</div>
+
+{% endif %}
+
+{% if profile %}
+
+<div class="profile">
+
+<h3>Detected Link Information</h3>
+
+<p><b>Source:</b> {{ profile.platform }}</p>
+<p><b>Title:</b> {{ profile.title }}</p>
+
+</div>
+
+{% endif %}
+
+{% if reasons %}
+
+<div class="analysis">
+
+<h3>AI Analysis Report</h3>
+
+<p><b>Detected Job Category :</b> {{ category }}</p>
+
+<p><b>Risk Score :</b> {{ risk }}/100</p>
+
+<ul>
+{% for r in reasons %}
+<li>{{ r }}</li>
+{% endfor %}
+</ul>
+
+</div>
+
+{% endif %}
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+</body>
+</html>
