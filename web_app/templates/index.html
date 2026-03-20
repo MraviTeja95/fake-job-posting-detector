@@ -11,21 +11,39 @@
 
 <body>
 
+<canvas id="particleCanvas"></canvas>    
+
 <div class="container">
 
 <h1>AI Fake Job Detector</h1>
 
 <p class="guide">
-Paste a job description OR LinkedIn profile link below.
+Paste a job description or LinkedIn profile link below.
 The AI system will analyse language patterns, hiring signals,
 and profile indicators to determine whether the job appears legitimate.
 </p>
 
 {% if not prediction %}
 
-<form method="POST" id="jobForm">
+<form method="POST" id="jobForm" enctype="multipart/form-data">
 
 <textarea name="job_input" placeholder="Paste job description or LinkedIn link here"></textarea>
+
+<label for="fileUpload" class="upload-box">
+
+<div class="upload-content">
+
+<span class="upload-icon">⬆</span>
+
+<p>Upload Screenshot</p>
+
+<small>Click to upload or drag & drop</small>
+
+</div>
+
+</label>
+
+<input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
 
 <button type="submit" id="analyzeBtn">Analyze</button>
 
@@ -107,15 +125,18 @@ Confidence : {{ confidence }}%
 
 <p><b>Risk Score :</b> {{ risk }}/100</p>
 
-<ul>
+<ul id="analysisList">
+
 {% for r in reasons %}
-<li>{{ r }}</li>
+<li class="analysis-item" data-text="{{ r }}"></li>
 {% endfor %}
+
 </ul>
 
 </div>
 
 {% endif %}
+
 </div>
 
 <script src="{{ url_for('static', filename='script.js') }}"></script>

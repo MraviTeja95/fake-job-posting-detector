@@ -14,6 +14,8 @@ font-family:Segoe UI;
 
 overflow-y:auto;
 
+overflow-x:hidden;
+
 padding-top:40px;
 
 }
@@ -21,18 +23,26 @@ padding-top:40px;
 .container{
 
 width:650px;
+max-width:92%;
 
 padding:40px;
 
-background:#1c1c1c;
+background:rgba(30,30,30,0.75);   /* semi transparent glass */
 
-border-radius:15px;
+backdrop-filter:blur(14px);
+-webkit-backdrop-filter:blur(14px);
 
-border:1px solid #2a2a2a;
+border-radius:16px;
 
-box-shadow:0 20px 60px rgba(0,0,0,0.7);
+border:1px solid rgba(255,255,255,0.08);
+
+box-shadow:
+0 20px 60px rgba(0,0,0,0.6),
+inset 0 0 1px rgba(255,255,255,0.1);
 
 text-align:center;
+
+margin:auto;
 
 }
 
@@ -53,7 +63,7 @@ margin-bottom:20px;
 textarea{
 
 width:100%;
-height:130px;
+height:140px;
 
 border:none;
 
@@ -65,9 +75,11 @@ font-size:15px;
 
 margin-top:15px;
 
-background:#2a2a2a;
+background:rgba(255,255,255,0.06);
 
 color:white;
+
+border:1px solid rgba(255,255,255,0.08);
 
 }
 
@@ -83,13 +95,15 @@ margin-top:20px;
 
 width:100%;
 
-padding:12px;
+padding:14px 18px;
+
+min-height:48px;
 
 border:none;
 
 border-radius:10px;
 
-background:white;
+background:rgba(255,255,255,0.9);
 
 color:black;
 
@@ -97,13 +111,15 @@ font-weight:600;
 
 cursor:pointer;
 
-transition:0.3s;
+transition:all 0.2s ease;
 
 }
 
 button:hover{
 
-transform:scale(1.03);
+transform:scale(1.05);
+
+box-shadow:0 0 20px rgba(255,255,255,0.4);
 
 }
 
@@ -115,9 +131,9 @@ font-size:16px;
 
 text-align:center;
 
-animation:pulse 1.5s infinite;
+animation:pulse 1.2s infinite;
 
-display:none;
+letter-spacing:1px;
 
 }
 
@@ -183,7 +199,7 @@ border-radius:10px;
 .meter{
 
 width:100%;
-height:20px;
+height:22px;
 
 background:#333;
 
@@ -221,4 +237,152 @@ color:black;
 
 cursor:pointer;
 
+}
+@keyframes fadeInUp{
+
+0%{
+opacity:0;
+transform:translateY(40px);
+}
+
+100%{
+opacity:1;
+transform:translateY(0);
+}
+
+}
+
+.container{
+
+animation:fadeInUp 0.8s ease;
+
+}
+#particleCanvas{
+
+position:fixed;
+top:0;
+left:0;
+
+width:100%;
+height:100%;
+
+z-index:-1;
+
+background:#0f0f0f;
+
+}
+/* =========================
+   Mobile Responsive Design
+========================= */
+
+@media (max-width: 768px){
+
+.container{
+
+width:95%;
+
+padding:25px;
+
+}
+
+h1{
+
+font-size:24px;
+
+}
+
+.guide{
+
+font-size:13px;
+
+}
+
+textarea{
+
+height:160px;
+
+font-size:16px;
+
+padding:18px;
+
+}
+
+button{
+
+font-size:18px;
+
+padding:16px;
+
+}
+
+.result{
+
+font-size:16px;
+
+}
+
+.analysis{
+
+font-size:14px;
+
+}
+
+}
+.analysis-item{
+
+margin-bottom:6px;
+
+opacity:0.95;
+
+}
+.upload-box{
+
+margin-top:20px;
+
+padding:18px;
+
+border:2px dashed rgba(255,255,255,0.2);
+
+border-radius:14px;
+
+text-align:center;
+
+cursor:pointer;
+
+transition:all 0.3s ease;
+
+background:rgba(255,255,255,0.03);
+
+display:flex;
+justify-content:center;
+align-items:center;
+
+}
+
+.upload-content{
+text-align:center;
+}
+
+.upload-box:hover{
+
+border-color:#3b82f6;
+
+background:rgba(255,255,255,0.06);
+
+transform:scale(1.02);
+
+}
+
+.upload-icon{
+
+font-size:24px;
+
+display:block;
+
+margin-bottom:10px;
+
+}
+.upload-box{
+padding:14px;
+min-height:70px;
 }
