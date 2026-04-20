@@ -386,3 +386,68 @@ margin-bottom:10px;
 padding:14px;
 min-height:70px;
 }
+.scam-word {
+    color: #ff4d4d;
+    font-weight: bold;
+    background: rgba(255, 0, 0, 0.1);
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+
+.highlighted-text {
+    line-height: 1.6;
+    font-size: 15px;
+}
+.bottom-nav {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.6);
+    padding: 10px 20px;
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+}
+
+.bottom-nav a {
+    color: #00f7ff;
+    margin: 0 10px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+.bottom-nav a:hover {
+    color: #ff4d4d;
+}
+.error-box {
+    background: rgba(255, 77, 77, 0.15);
+    color: #ff4d4d;
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    margin-bottom: 15px;
+    font-weight: bold;
+}
+
+input {
+    width: 80%;
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    outline: none;
+    margin: 5px 0;
+}
+
+button {
+    background: #00f7ff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #ff4d4d;
+    color: white;
+}

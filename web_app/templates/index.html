@@ -6,12 +6,11 @@
 <title>AI Fake Job Detector</title>
 
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-
 </head>
 
 <body>
 
-<canvas id="particleCanvas"></canvas>    
+<canvas id="particleCanvas"></canvas>
 
 <div class="container">
 
@@ -20,27 +19,27 @@
 <p class="guide">
 Paste a job description or LinkedIn profile link below.
 The AI system will analyse language patterns, hiring signals,
-and profile indicators to determine whether the job appears legitimate.
+and detect whether the job appears legitimate.
 </p>
 
 {% if not prediction %}
+
+{% if error %}
+<div class="error-box">
+    {{ error }}
+</div>
+{% endif %}
 
 <form method="POST" id="jobForm" enctype="multipart/form-data">
 
 <textarea name="job_input" placeholder="Paste job description or LinkedIn link here"></textarea>
 
 <label for="fileUpload" class="upload-box">
-
 <div class="upload-content">
-
 <span class="upload-icon">⬆</span>
-
 <p>Upload Screenshot</p>
-
-<small>Click to upload or drag & drop</small>
-
+<small>Click to upload</small>
 </div>
-
 </label>
 
 <input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
@@ -56,22 +55,39 @@ and profile indicators to determine whether the job appears legitimate.
 {% if prediction %}
 
 <div class="result {{ prediction|lower }}">
-
 <h3>Analysis Result</h3>
-
 Prediction : {{ prediction }} <br>
 Confidence : {{ confidence }}%
-
 </div>
 
+{% if highlighted_text %}
+<div class="analysis">
+<h3>Highlighted Job Description</h3>
+
+<p class="highlighted-text">
+{{ highlighted_text|safe }}
+</p>
+
+</div>
+{% endif %}
+
+{% if processed_image %}
+<div class="analysis">
+<h3>Screenshot Analysis</h3>
+
+<img src="/static/processed.png?v={{ confidence }}"
+     style="width:100%; border-radius:10px; margin-top:10px;">
+
+</div>
+{% endif %}
+
+<!-- RISK METER -->
 <div class="analysis">
 
 <h3>Fake Job Probability Meter</h3>
 
 <div class="meter">
-
 <div class="meter-bar" style="width: {{ risk }}%"></div>
-
 </div>
 
 <p>{{ risk }}% Scam Risk</p>
@@ -89,13 +105,9 @@ Confidence : {{ confidence }}%
 <h3>AI Safety Suggestions</h3>
 
 <ul>
-
 {% for s in suggestions %}
-
 <li>{{ s }}</li>
-
 {% endfor %}
-
 </ul>
 
 </div>
@@ -122,15 +134,12 @@ Confidence : {{ confidence }}%
 <h3>AI Analysis Report</h3>
 
 <p><b>Detected Job Category :</b> {{ category }}</p>
-
 <p><b>Risk Score :</b> {{ risk }}/100</p>
 
 <ul id="analysisList">
-
 {% for r in reasons %}
 <li class="analysis-item" data-text="{{ r }}"></li>
 {% endfor %}
-
 </ul>
 
 </div>
@@ -140,6 +149,11 @@ Confidence : {{ confidence }}%
 </div>
 
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<div class="bottom-nav">
+    <a href="/history">📊 View History</a>
+    <a href="/logout">🚪 Logout</a>
+</div>
 
 </body>
 </html>

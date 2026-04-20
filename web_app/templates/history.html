@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>History - AI Fake Job Detector</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+<canvas id="particleCanvas"></canvas>
+
+<div class="container">
+
+<h1>📊 Your Scan History</h1>
+
+{% if data %}
+
+{% for item in data %}
+<div class="analysis">
+
+<p><b>Text:</b> {{ item.input_text }}</p>
+<p><b>Result:</b> {{ item.prediction }}</p>
+<p><b>Risk:</b> {{ item.risk }}%</p>
+
+</div>
+{% endfor %}
+
+{% else %}
+
+<div class="analysis">
+<p>No history found.</p>
+</div>
+
+{% endif %}
+
+<button onclick="location.href='/'" class="back-btn">⬅ Back</button>
+
+</div>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+
+<div class="bottom-nav">
+    <a href="/">🏠 Home</a>
+    <a href="/logout">🚪 Logout</a>
+</div>
+
+</body>
+</html>
