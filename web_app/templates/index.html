@@ -1,24 +1,55 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
-<meta charset="UTF-8">
-<title>AI Fake Job Detector</title>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-</head>
-
 <body>
 
 <canvas id="particleCanvas"></canvas>
 
+<!-- 🔥 PROFILE (OUTSIDE CONTAINER — VERY IMPORTANT) -->
+{% if user and user.is_authenticated %}
+<div class="profile-box">
+
+<div class="profile-wrapper">
+
+    {% if user.is_authenticated %}
+    <div class="profile-box" onclick="toggleMenu()">
+        <div class="avatar">{{ user.username|first|upper }}</div>
+        <div class="profile-info">
+            <span class="username">{{ user.username }}</span>
+            <span class="status">Active</span>
+        </div>
+    </div>
+
+    <!-- DROPDOWN -->
+    <div id="profileMenu" class="profile-menu">
+        <a href="/history">📊 History</a>
+        <a href="/logout">🚪 Logout</a>
+    </div>
+
+    {% else %}
+    <!-- LOGIN BUTTON -->
+    <a href="/login" class="login-btn">Login</a>
+    {% endif %}
+
+</div>
+</div>
+{% endif %}<head>
+<meta charset="UTF-8">
+<title>SafeRecruit AI - Fake Job Detection</title>
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<
+
+<!-- ✅ MAIN UI -->
 <div class="container">
 
-<h1>AI Fake Job Detector</h1>
+<h1>SafeRecruit AI</h1>
 
 <p class="guide">
 Paste a job description or LinkedIn profile link below.
-The AI system will analyse language patterns, hiring signals,
+SafeRecruit AI will analyse language patterns, hiring signals,
 and detect whether the job appears legitimate.
 </p>
 
@@ -76,14 +107,12 @@ Confidence : {{ confidence }}%
 <h3>Screenshot Analysis</h3>
 
 <img src="/static/processed.png?v={{ confidence }}"
+     alt="Processed Screenshot"
      style="width:100%; border-radius:10px; margin-top:10px;">
-
 </div>
 {% endif %}
 
-<!-- RISK METER -->
 <div class="analysis">
-
 <h3>Fake Job Probability Meter</h3>
 
 <div class="meter">
@@ -91,46 +120,33 @@ Confidence : {{ confidence }}%
 </div>
 
 <p>{{ risk }}% Scam Risk</p>
-
 </div>
 
-<button onclick="location.href='/'" class="back-btn">Back</button>
+<button onclick="location.href='/'" class="back-btn">⬅ Back</button>
 
 {% endif %}
 
 {% if suggestions %}
-
 <div class="analysis">
-
 <h3>AI Safety Suggestions</h3>
-
 <ul>
 {% for s in suggestions %}
 <li>{{ s }}</li>
 {% endfor %}
 </ul>
-
 </div>
-
 {% endif %}
 
 {% if profile %}
-
 <div class="profile">
-
 <h3>Detected Link Information</h3>
-
 <p><b>Source:</b> {{ profile.platform }}</p>
 <p><b>Title:</b> {{ profile.title }}</p>
-
 </div>
-
 {% endif %}
 
 {% if reasons %}
-
 <div class="analysis">
-
 <h3>AI Analysis Report</h3>
 
 <p><b>Detected Job Category :</b> {{ category }}</p>
@@ -143,17 +159,28 @@ Confidence : {{ confidence }}%
 </ul>
 
 </div>
-
 {% endif %}
 
 </div>
 
+<!-- JS -->
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 
-<div class="bottom-nav">
-    <a href="/history">📊 View History</a>
-    <a href="/logout">🚪 Logout</a>
-</div>
+<script>
+function toggleMenu() {
+    const dropdown = document.getElementById('profileDropdown');
+    dropdown.classList.toggle('active');
+}
+
+document.addEventListener('click', function(event) {
+    const profileBox = document.querySelector('.profile-box');
+    const dropdown = document.getElementById('profileDropdown');
+
+    if (profileBox && dropdown && !profileBox.contains(event.target)) {
+        dropdown.classList.remove('active');
+    }
+});
+</script>
 
 </body>
 </html>
