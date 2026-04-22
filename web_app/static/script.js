@@ -153,27 +153,5 @@ if (canvas) {
     });
 }
 
-// ==========================
-// AI Typing Effect
-// ==========================
-window.addEventListener("load", () => {
-    const items = document.querySelectorAll(".analysis-item");
-    if (!items.length) return;
-
-    let delay = 500;
-    items.forEach((item) => {
-        const text = item.dataset.text;
-        setTimeout(() => typeText(item, text, 0), delay);
-        delay += text.length * 35 + 400;
-    });
-});
-
-function typeText(element, text, i) {
-    if (i < text.length) {
-        element.innerHTML += text.charAt(i);
-        setTimeout(() => typeText(element, text, i + 1), 20);
-    }
-}
-
 // ✅ NOTE: toggleMenu is defined in index.html <script> block only.
 //    It is NOT defined here to avoid duplicate function conflicts.
