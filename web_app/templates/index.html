@@ -1,186 +1,191 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<body>
-
-<canvas id="particleCanvas"></canvas>
-
-<!-- 🔥 PROFILE (OUTSIDE CONTAINER — VERY IMPORTANT) -->
-{% if user and user.is_authenticated %}
-<div class="profile-box">
-
-<div class="profile-wrapper">
-
-    {% if user.is_authenticated %}
-    <div class="profile-box" onclick="toggleMenu()">
-        <div class="avatar">{{ user.username|first|upper }}</div>
-        <div class="profile-info">
-            <span class="username">{{ user.username }}</span>
-            <span class="status">Active</span>
-        </div>
-    </div>
-
-    <!-- DROPDOWN -->
-    <div id="profileMenu" class="profile-menu">
-        <a href="/history">📊 History</a>
-        <a href="/logout">🚪 Logout</a>
-    </div>
-
-    {% else %}
-    <!-- LOGIN BUTTON -->
-    <a href="/login" class="login-btn">Login</a>
-    {% endif %}
-
-</div>
-</div>
-{% endif %}<head>
-<meta charset="UTF-8">
-<title>SafeRecruit AI - Fake Job Detection</title>
-
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRecruit AI - Fake Job Detection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<
+<body>
+    <canvas id="particleCanvas"></canvas>
 
-<!-- ✅ MAIN UI -->
-<div class="container">
+    <!-- PROFILE SECTION -->
+    <div class="profile-wrapper">
+        {% if user and user.is_authenticated %}
+        <div class="profile-box" onclick="toggleMenu()">
+            <div class="avatar">{{ user.username[0]|upper }}</div>
+            <div class="profile-info">
+                <span class="username">{{ user.username }}</span>
+                <span class="status">Active</span>
+            </div>
+        </div>
+        <div id="profileMenu" class="profile-menu">
+            <a href="/history">📊 History</a>
+            <a href="/logout">🚪 Logout</a>
+        </div>
+        {% else %}
+        <a href="/login" class="login-btn">Login</a>
+        {% endif %}
+    </div>
 
-<h1>SafeRecruit AI</h1>
+    <!-- MAIN CONTAINER -->
+    <div class="container">
+        <div class="header-section">
+            <h1>🛡️ SafeRecruit AI</h1>
+            <p class="guide">Detect fake job postings in seconds</p>
+        </div>
 
-<p class="guide">
-Paste a job description or LinkedIn profile link below.
-SafeRecruit AI will analyse language patterns, hiring signals,
-and detect whether the job appears legitimate.
-</p>
+        {% if not prediction %}
+        <!-- ANALYSIS FORM -->
+        <div class="form-section">
+            {% if error %}
+            <div class="error-box">{{ error }}</div>
+            {% endif %}
 
-{% if not prediction %}
+            <form method="POST" id="jobForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="jobInput" class="form-label">Job Description or Link</label>
+                    <textarea
+                        id="jobInput"
+                        name="job_input"
+                        class="textarea-input"
+                        placeholder="Paste job description, LinkedIn link, or job posting text here...">
+                    </textarea>
+                </div>
 
-{% if error %}
-<div class="error-box">
-    {{ error }}
-</div>
-{% endif %}
+                <div class="form-group">
+                    <label for="fileUpload" class="upload-label">
+                        <div class="upload-box">
+                            <div class="upload-icon">📸</div>
+                            <div class="upload-text">
+                                <p>Upload Screenshot</p>
+                                <small>Optional - JPG, PNG up to 16MB</small>
+                            </div>
+                        </div>
+                        <input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
+                    </label>
+                </div>
 
-<form method="POST" id="jobForm" enctype="multipart/form-data">
+                <button type="submit" id="analyzeBtn" class="submit-btn">
+                    <span id="btnText">🔍 Analyze Job</span>
+                    <span id="btnLoader" class="btn-loader" style="display:none;">⏳ Analyzing...</span>
+                </button>
+            </form>
 
-<textarea name="job_input" placeholder="Paste job description or LinkedIn link here"></textarea>
+            <div id="loader" class="page-loader" style="display:none;">
+                <div class="spinner"></div>
+                <p id="loaderText">Analyzing job description...</p>
+            </div>
+        </div>
 
-<label for="fileUpload" class="upload-box">
-<div class="upload-content">
-<span class="upload-icon">⬆</span>
-<p>Upload Screenshot</p>
-<small>Click to upload</small>
-</div>
-</label>
+        {% else %}
+        <!-- RESULTS SECTION -->
+        <div class="results-section">
+            <!-- Result Card -->
+            <div class="result-card {{ prediction|lower }}">
+                <div class="result-header">
+                    {% if prediction == "FAKE" %}
+                    <span class="result-icon">⚠️</span>
+                    {% elif prediction == "REAL" %}
+                    <span class="result-icon">✅</span>
+                    {% else %}
+                    <span class="result-icon">❓</span>
+                    {% endif %}
+                </div>
+                <h2>{{ prediction }}</h2>
+                <div class="result-stats">
+                    <div class="stat">
+                        <span class="stat-label">Confidence</span>
+                        <span class="stat-value">{{ confidence }}%</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Risk Level</span>
+                        <span class="stat-value">{{ risk }}/100</span>
+                    </div>
+                </div>
+            </div>
 
-<input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
+            <!-- Risk Meter -->
+            <div class="analysis-card">
+                <h3>📊 Risk Assessment</h3>
+                <div class="meter">
+                    <div class="meter-bar" style="width: {{ risk }}%"></div>
+                </div>
+                <p class="risk-text">{{ risk }}% Scam Risk</p>
+                <p class="category-badge">{{ category }}</p>
+            </div>
 
-<button type="submit" id="analyzeBtn">Analyze</button>
+            <!-- Job Description Preview -->
+            {% if highlighted_text %}
+            <div class="analysis-card">
+                <h3>📄 Job Description</h3>
+                <div class="text-preview">{{ highlighted_text|safe }}</div>
+            </div>
+            {% endif %}
 
-</form>
+            <!-- Key Findings -->
+            {% if reasons %}
+            <div class="analysis-card">
+                <h3>🔍 Key Findings</h3>
+                <ul class="findings-list">
+                    {% for r in reasons %}
+                    <li class="finding-item">{{ r }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
 
-{% endif %}
+            <!-- Safety Tips -->
+            {% if suggestions %}
+            <div class="analysis-card">
+                <h3>💡 Safety Tips</h3>
+                <ul class="tips-list">
+                    {% for s in suggestions %}
+                    <li class="tip-item">{{ s }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
 
-<div id="loader" class="loader"></div>
+            <!-- Screenshot Analysis -->
+            {% if processed_image %}
+            <div class="analysis-card">
+                <h3>🖼️ Screenshot Analysis</h3>
+                <img src="/static/processed.png?v={{ confidence }}" class="result-image">
+            </div>
+            {% endif %}
 
-{% if prediction %}
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button onclick="location.href='/'" class="btn-secondary">← New Analysis</button>
+                <a href="/history" class="btn-secondary">📊 View History</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
 
-<div class="result {{ prediction|lower }}">
-<h3>Analysis Result</h3>
-Prediction : {{ prediction }} <br>
-Confidence : {{ confidence }}%
-</div>
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        document.getElementById('jobForm')?.addEventListener('submit', function() {
+            document.getElementById('btnText').style.display = 'none';
+            document.getElementById('btnLoader').style.display = 'inline';
+            document.getElementById('analyzeBtn').disabled = true;
+        });
 
-{% if highlighted_text %}
-<div class="analysis">
-<h3>Highlighted Job Description</h3>
+        function toggleMenu() {
+            const menu = document.getElementById('profileMenu');
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
 
-<p class="highlighted-text">
-{{ highlighted_text|safe }}
-</p>
-
-</div>
-{% endif %}
-
-{% if processed_image %}
-<div class="analysis">
-<h3>Screenshot Analysis</h3>
-
-<img src="/static/processed.png?v={{ confidence }}"
-     alt="Processed Screenshot"
-     style="width:100%; border-radius:10px; margin-top:10px;">
-</div>
-{% endif %}
-
-<div class="analysis">
-<h3>Fake Job Probability Meter</h3>
-
-<div class="meter">
-<div class="meter-bar" style="width: {{ risk }}%"></div>
-</div>
-
-<p>{{ risk }}% Scam Risk</p>
-</div>
-
-<button onclick="location.href='/'" class="back-btn">⬅ Back</button>
-
-{% endif %}
-
-{% if suggestions %}
-<div class="analysis">
-<h3>AI Safety Suggestions</h3>
-<ul>
-{% for s in suggestions %}
-<li>{{ s }}</li>
-{% endfor %}
-</ul>
-</div>
-{% endif %}
-
-{% if profile %}
-<div class="profile">
-<h3>Detected Link Information</h3>
-<p><b>Source:</b> {{ profile.platform }}</p>
-<p><b>Title:</b> {{ profile.title }}</p>
-</div>
-{% endif %}
-
-{% if reasons %}
-<div class="analysis">
-<h3>AI Analysis Report</h3>
-
-<p><b>Detected Job Category :</b> {{ category }}</p>
-<p><b>Risk Score :</b> {{ risk }}/100</p>
-
-<ul id="analysisList">
-{% for r in reasons %}
-<li class="analysis-item" data-text="{{ r }}"></li>
-{% endfor %}
-</ul>
-
-</div>
-{% endif %}
-
-</div>
-
-<!-- JS -->
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-
-<script>
-function toggleMenu() {
-    const dropdown = document.getElementById('profileDropdown');
-    dropdown.classList.toggle('active');
-}
-
-document.addEventListener('click', function(event) {
-    const profileBox = document.querySelector('.profile-box');
-    const dropdown = document.getElementById('profileDropdown');
-
-    if (profileBox && dropdown && !profileBox.contains(event.target)) {
-        dropdown.classList.remove('active');
-    }
-});
-</script>
-
+        // Close menu when clicking outside
+        document.addEventListener('click', function(e) {
+            const menu = document.getElementById('profileMenu');
+            const profileBox = document.querySelector('.profile-box');
+            if (!profileBox?.contains(e.target) && menu) {
+                menu.style.display = 'none';
+            }
+        });
+    </script>
 </body>
 </html>

@@ -1,33 +1,35 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Signup</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SafeRecruit AI - Signup</title>
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="login-page">
 
 <canvas id="particleCanvas"></canvas>
 
 <div class="container">
 
-<h1>📝 Create Account</h1>
+<h1>📝 SafeRecruit AI</h1>
+
+<p style="color: #666; margin-bottom: 20px;">Create your account</p>
 
 <form method="POST">
 
-<input name="username" placeholder="Username" required>
-<br><br>
+<input type="text" name="username" placeholder="👤 Enter Username" required autofocus>
 
-<input name="password" type="password" placeholder="Password" required>
-<br><br>
+<input type="password" name="password" placeholder="🔑 Enter Password" required>
 
-<button type="submit">Signup</button>
+<button type="submit">Create Account</button>
 
 </form>
 
-<br>
-
-<a href="/login">Login</a>
+<p style="margin-top: 15px; font-size: 13px;">
+Already have an account? <a href="/login">Login here</a>
+</p>
 
 </div>
 

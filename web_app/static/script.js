@@ -110,7 +110,7 @@ if (canvas) {
         draw() {
             ctx.beginPath();
             ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(80,80,80,0.6)";
+            ctx.fillStyle = "rgba(0, 0, 0, 0.4)";
             ctx.fill();
 
             let dx = this.x - mouseX;
@@ -120,7 +120,7 @@ if (canvas) {
             if (distance < 150) {
                 ctx.beginPath();
                 ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(100,100,100,${(1 - distance / 150) * 0.4})`;
+                ctx.fillStyle = `rgba(0, 0, 0, ${(1 - distance / 150) * 0.6})`;
                 ctx.fill();
             }
         }
@@ -139,7 +139,7 @@ if (canvas) {
 
                 if (distance < 120) {
                     ctx.beginPath();
-                    ctx.strokeStyle = "rgba(150,150,150,0.15)";
+                    ctx.strokeStyle = "rgba(0, 0, 0, 0.1)";
                     ctx.lineWidth = 1;
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
