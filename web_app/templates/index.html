@@ -11,12 +11,13 @@
     <canvas id="particleCanvas"></canvas>
 
     <!-- PROFILE SECTION -->
+    <!-- ✅ FIX: use current_user (Flask-Login), not 'user' -->
     <div class="profile-wrapper">
-        {% if user and user.is_authenticated %}
+        {% if current_user.is_authenticated %}
         <div class="profile-box" onclick="toggleMenu()">
-            <div class="avatar">{{ user.username[0]|upper }}</div>
+            <div class="avatar">{{ current_user.username[0]|upper }}</div>
             <div class="profile-info">
-                <span class="username">{{ user.username }}</span>
+                <span class="username">{{ current_user.username }}</span>
                 <span class="status">Active</span>
             </div>
         </div>
@@ -82,16 +83,11 @@
         {% else %}
         <!-- RESULTS SECTION -->
         <div class="results-section">
-            <!-- Result Card -->
             <div class="result-card {{ prediction|lower }}">
                 <div class="result-header">
-                    {% if prediction == "FAKE" %}
-                    <span class="result-icon">⚠️</span>
-                    {% elif prediction == "REAL" %}
-                    <span class="result-icon">✅</span>
-                    {% else %}
-                    <span class="result-icon">❓</span>
-                    {% endif %}
+                    {% if prediction == "FAKE" %}<span class="result-icon">⚠️</span>
+                    {% elif prediction == "REAL" %}<span class="result-icon">✅</span>
+                    {% else %}<span class="result-icon">❓</span>{% endif %}
                 </div>
                 <h2>{{ prediction }}</h2>
                 <div class="result-stats">
@@ -106,7 +102,6 @@
                 </div>
             </div>
 
-            <!-- Risk Meter -->
             <div class="analysis-card">
                 <h3>📊 Risk Assessment</h3>
                 <div class="meter">
@@ -116,7 +111,6 @@
                 <p class="category-badge">{{ category }}</p>
             </div>
 
-            <!-- Job Description Preview -->
             {% if highlighted_text %}
             <div class="analysis-card">
                 <h3>📄 Job Description</h3>
@@ -124,7 +118,6 @@
             </div>
             {% endif %}
 
-            <!-- Key Findings -->
             {% if reasons %}
             <div class="analysis-card">
                 <h3>🔍 Key Findings</h3>
@@ -136,7 +129,6 @@
             </div>
             {% endif %}
 
-            <!-- Safety Tips -->
             {% if suggestions %}
             <div class="analysis-card">
                 <h3>💡 Safety Tips</h3>
@@ -148,7 +140,6 @@
             </div>
             {% endif %}
 
-            <!-- Screenshot Analysis -->
             {% if processed_image %}
             <div class="analysis-card">
                 <h3>🖼️ Screenshot Analysis</h3>
@@ -156,7 +147,6 @@
             </div>
             {% endif %}
 
-            <!-- Action Buttons -->
             <div class="action-buttons">
                 <button onclick="location.href='/'" class="btn-secondary">← New Analysis</button>
                 <a href="/history" class="btn-secondary">📊 View History</a>
@@ -165,27 +155,32 @@
         {% endif %}
     </div>
 
+    <!-- ✅ FIX: script.js loaded first (it defines toggleMenu) -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
-        document.getElementById('jobForm')?.addEventListener('submit', function() {
+        // Handle analyze button state on submit
+        document.getElementById('jobForm')?.addEventListener('submit', function () {
             document.getElementById('btnText').style.display = 'none';
             document.getElementById('btnLoader').style.display = 'inline';
             document.getElementById('analyzeBtn').disabled = true;
         });
 
-        function toggleMenu() {
-            const menu = document.getElementById('profileMenu');
-            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-        }
-
-        // Close menu when clicking outside
-        document.addEventListener('click', function(e) {
+        // Close profile menu when clicking outside
+        document.addEventListener('click', function (e) {
             const menu = document.getElementById('profileMenu');
             const profileBox = document.querySelector('.profile-box');
-            if (!profileBox?.contains(e.target) && menu) {
+            if (menu && !profileBox?.contains(e.target)) {
                 menu.style.display = 'none';
             }
         });
+
+        // ✅ FIX: toggleMenu defined ONLY here (removed duplicate from old script.js)
+        function toggleMenu() {
+            const menu = document.getElementById('profileMenu');
+            if (menu) {
+                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+            }
+        }
     </script>
 </body>
 </html>
