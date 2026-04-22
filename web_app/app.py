@@ -195,6 +195,66 @@ def extract_text_from_image(image_path):
     except Exception as e:
         return None
 
+def highlight_keywords_in_image(image_path, keywords):
+    """Draw red highlights on keywords found in the image."""
+    try:
+        from PIL import Image, ImageDraw, ImageFont
+        import pytesseract
+
+        if not os.path.exists(image_path):
+            return False
+
+        # Open image
+        img = Image.open(image_path)
+        draw = ImageDraw.Draw(img)
+
+        # Get detailed OCR data with bounding boxes
+        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
+
+        # For each word in the OCR results
+        highlighted = False
+        for i in range(len(data['text'])):
+            word = data['text'][i].lower().strip()
+
+            # Check if word matches any keyword
+            for keyword in keywords:
+                if keyword.lower() in word:
+                    # Get bounding box
+                    x = data['left'][i]
+                    y = data['top'][i]
+                    w = data['width'][i]
+                    h = data['height'][i]
+
+                    # Draw red rectangle with border
+                    # Coordinates: (left, top, right, bottom)
+                    draw.rectangle(
+                        [x, y, x + w, y + h],
+                        outline='red',
+                        width=3
+                    )
+
+                    # Add semi-transparent red background
+                    # Create a new image for transparency effect
+                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+                    overlay_draw = ImageDraw.Draw(overlay)
+                    overlay_draw.rectangle(
+                        [x, y, x + w, y + h],
+                        fill=(255, 0, 0, 80)  # Red with 80/255 transparency
+                    )
+                    img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
+                    draw = ImageDraw.Draw(img)
+
+                    highlighted = True
+                    break
+
+        # Save the marked image
+        processed_path = os.path.join(app.config['UPLOAD_FOLDER'], 'processed.png')
+        img.save(processed_path)
+        return highlighted
+
+    except Exception as e:
+        return False
+
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def home():
@@ -214,6 +274,15 @@ def home():
                 if extracted:
                     job_input = extracted
                     processed_image = True
+
+                    # Highlight keywords in the screenshot image
+                    keywords_to_highlight = [
+                        "upfront", "bitcoin", "western union", "wire transfer", "gift card",
+                        "urgent", "immediate", "immediate start", "no interview", "no experience",
+                        "guaranteed income", "quick money", "easy money", "risk-free",
+                        "itunes card", "no cv needed", "act now", "don't delay", "limited time"
+                    ]
+                    highlight_keywords_in_image(filepath, keywords_to_highlight)
                 else:
                     error = "Could not extract text from image. Please paste text instead."
             except Exception as e:
@@ -239,9 +308,10 @@ def home():
 
             for kw in keywords_to_highlight:
                 if kw.lower() in job_input.lower():
+                    # Use red highlighting: #e74c3c (bright red)
                     pattern = re.compile(re.escape(kw), re.IGNORECASE)
                     highlighted_text = pattern.sub(
-                        f'<mark style="background-color:#ffcccc;">\\g<0></mark>',
+                        f'<mark style="background-color:#e74c3c; color:white; padding:2px 4px; border-radius:3px; font-weight:bold;">\\g<0></mark>',
                         highlighted_text
                     )
 
