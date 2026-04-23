@@ -344,7 +344,7 @@ a {
 }
 
 .header-section h1 {
-    font-size: 3.5rem;
+    font-size: 2.2rem;
 }
 
 .guide,
@@ -1021,6 +1021,26 @@ input[type="email"]:focus {
     padding: 56px 48px;
     border: 2px solid var(--ink);
     box-shadow: var(--shadow-strong);
+    text-align: center;
+}
+
+.login-card .login-logo {
+    margin: 0 auto 20px;
+}
+
+.login-card .login-title {
+    margin-bottom: 32px;
+    font-size: 2.2rem;
+}
+
+.login-card .field-group {
+    margin-bottom: 16px;
+}
+
+.login-card .login-note {
+    margin-top: 28px;
+    color: var(--ink-soft);
+    font-size: 0.95rem;
 }
 
 .login-header {
@@ -1410,6 +1430,77 @@ input[type="email"]:focus {
 [data-theme="chatgpt"] .chatgpt-bar {
     position: relative;
     display: flex;
+    flex-direction: column;
+    padding: 0;
+    width: 100%;
+}
+
+/* Image preview area — hidden by default, shown when image is attached */
+.img-preview-area {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px 4px 16px;
+}
+
+.img-thumb-wrapper {
+    position: relative;
+    width: 60px;
+    height: 60px;
+    border-radius: 10px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: var(--surface-strong);
+    border: 1px solid var(--line);
+}
+
+.img-preview-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.img-thumb-remove {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.7);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    min-height: auto;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 2;
+}
+
+.img-thumb-wrapper:hover .img-thumb-remove {
+    opacity: 1;
+}
+
+.img-file-name {
+    font-size: 0.8rem;
+    color: var(--muted);
+    max-width: 200px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Input row: textarea + right actions */
+[data-theme="chatgpt"] .chatgpt-input-row {
+    display: flex;
     flex-direction: row;
     align-items: flex-end;
     padding: 10px 14px;
@@ -1458,51 +1549,6 @@ input[type="email"]:focus {
     flex-grow: 1;
 }
 
-/* Image confirm badge inside prompt bar */
-.img-confirm-badge {
-    display: none;
-    align-items: center;
-    gap: 10px;
-    padding: 6px 10px;
-    background: var(--surface-strong);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    font-size: 0.82rem;
-    color: var(--ink);
-    width: fit-content;
-    animation: fadeUp 0.2s ease;
-}
-
-.img-preview-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 8px;
-    object-fit: cover;
-    border: 1px solid var(--line);
-    flex-shrink: 0;
-}
-
-.img-confirm-name {
-    max-width: 160px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-size: 0.8rem;
-}
-
-.img-confirm-remove {
-    background: none;
-    border: none;
-    cursor: pointer;
-    font-size: 1rem;
-    color: var(--ink-soft);
-    padding: 0;
-    line-height: 1;
-    min-height: auto;
-    display: flex;
-    align-items: center;
-}
-
 /* ChatGPT: hide standalone upload, show inline upload */
 [data-theme="chatgpt"] .upload-label-standalone {
     display: none !important;
@@ -1548,6 +1594,7 @@ input[type="email"]:focus {
     line-height: 1.5;
     overflow: hidden !important;
     font-size: 1rem;
+    transform: none !important;
 }
 
 [data-theme="chatgpt"] .chatgpt-content-area {

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeRecruit AI - Fake Job Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
 </head>
 
 <body class="main-page">
@@ -65,35 +65,39 @@
 
                 <!-- ChatGPT prompt bar: upload + textarea inline -->
                 <div class="form-group chatgpt-input-wrapper">
-                    <!-- Image preview chip: shows above the input bar after upload -->
-                    <div id="imgConfirmBadge" class="img-confirm-badge" style="display:none;">
-                        <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="preview">
-                        <span id="imgConfirmName" class="img-confirm-name">image.png</span>
-                        <button type="button" onclick="clearUpload()" class="img-confirm-remove" title="Remove image">&times;</button>
-                    </div>
-
                     <div class="chatgpt-bar">
-                        <div class="chatgpt-content-area">
-                            <textarea
-                                id="jobInput"
-                                name="job_input"
-                                class="textarea-input"
-                                rows="1"
-                                placeholder="Analyze a job posting for fraud signals..."
-                                style="overflow:hidden;"
-                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                            ></textarea>
+                        <!-- Image thumbnail preview area (inside the rounded box) -->
+                        <div id="imgPreviewArea" class="img-preview-area">
+                            <div class="img-thumb-wrapper">
+                                <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="Uploaded image preview">
+                                <button type="button" id="imgRemoveBtn" class="img-thumb-remove" title="Remove image">&times;</button>
+                            </div>
+                            <span id="imgFileName" class="img-file-name"></span>
                         </div>
 
-                        <div class="chatgpt-actions-right">
-                            <label for="fileUploadInline" class="upload-label-inline" title="Upload screenshot">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                                <input type="file" id="fileUploadInline" name="job_image" accept="image/*" hidden
-                                    onchange="showImagePreview(this)">
-                            </label>
-                            <button type="submit" id="analyzeBtn" class="submit-btn chatgpt-send-btn">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
-                            </button>
+                        <!-- Input row: textarea + actions -->
+                        <div class="chatgpt-input-row">
+                            <div class="chatgpt-content-area">
+                                <textarea
+                                    id="jobInput"
+                                    name="job_input"
+                                    class="textarea-input"
+                                    rows="1"
+                                    placeholder="Analyze a job posting for fraud signals..."
+                                    style="overflow:hidden;"
+                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                                ></textarea>
+                            </div>
+
+                            <div class="chatgpt-actions-right">
+                                <label for="fileUploadInline" class="upload-label-inline" title="Upload screenshot">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                                    <input type="file" id="fileUploadInline" name="job_image" accept="image/*" hidden>
+                                </label>
+                                <button type="submit" id="analyzeBtn" class="submit-btn chatgpt-send-btn">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -243,7 +247,7 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='script.js') }}?v=3"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=5"></script>
     <script>
         function toggleGuide() {
             const popup = document.getElementById('guidePopup');
@@ -256,74 +260,94 @@
             if (el) el.style.display = 'block';
         })();
 
-        // Upload image confirmation badge with thumbnail preview
-        function setupUploadConfirm(inputId) {
-            var input = document.getElementById(inputId);
-            if (!input) return;
-            input.addEventListener('change', function() {
-                var badge = document.getElementById('imgConfirmBadge');
-                var nameEl = document.getElementById('imgConfirmName');
-                var thumbEl = document.getElementById('imgPreviewThumb');
-                if (this.files && this.files[0]) {
-                    var file = this.files[0];
-                    var name = file.name;
-                    if (nameEl) nameEl.textContent = name.length > 22 ? name.slice(0, 20) + '...' : name;
-                    if (file.type.startsWith('image/')) {
-                        var reader = new FileReader();
-                        reader.onload = function(e) {
-                            if (thumbEl) thumbEl.src = e.target.result;
-                            if (badge) badge.style.display = 'flex';
-                        };
-                        reader.readAsDataURL(file);
-                    } else {
-                        if (thumbEl) thumbEl.src = '';
-                        if (badge) badge.style.display = 'flex';
-                    }
-                }
-            });
-        }
-        setupUploadConfirm('fileUploadInline');
-        setupUploadConfirm('fileUpload');
+        // === Image Thumbnail Preview (ChatGPT-style) ===
+        (function() {
+            var previewArea = document.getElementById('imgPreviewArea');
+            var thumbEl = document.getElementById('imgPreviewThumb');
+            var nameEl = document.getElementById('imgFileName');
+            var removeBtn = document.getElementById('imgRemoveBtn');
+            var inlineInput = document.getElementById('fileUploadInline');
+            var standaloneInput = document.getElementById('fileUpload');
 
-        // Support pasting images directly into the textarea (ChatGPT style)
-        document.addEventListener('paste', function(e) {
-            var items = (e.clipboardData || e.originalEvent.clipboardData).items;
-            for (var i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image/') === 0) {
-                    var file = items[i].getAsFile();
-                    if (file) {
-                        // Create a new DataTransfer to assign the file to the input
-                        var dt = new DataTransfer();
-                        dt.items.add(file);
-                        
-                        var inlineInput = document.getElementById('fileUploadInline');
-                        if (inlineInput) {
-                            inlineInput.files = dt.files;
-                            // Manually trigger the change event to show the preview
-                            var event = new Event('change', { bubbles: true });
-                            inlineInput.dispatchEvent(event);
-                        }
-                    }
-                    break;
+            function showPreview(file) {
+                if (!file || !previewArea || !thumbEl) return;
+                if (file.type.startsWith('image/')) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        thumbEl.src = e.target.result;
+                        if (nameEl) nameEl.textContent = file.name.length > 25 ? file.name.slice(0, 22) + '...' : file.name;
+                        previewArea.style.display = 'flex';
+                    };
+                    reader.readAsDataURL(file);
                 }
             }
-        });
 
-        function clearUpload() {
-            ['fileUploadInline', 'fileUpload'].forEach(function(id) {
-                var el = document.getElementById(id);
-                if (el) el.value = '';
+            function hidePreview() {
+                if (previewArea) previewArea.style.display = 'none';
+                if (thumbEl) thumbEl.src = '';
+                if (nameEl) nameEl.textContent = '';
+                if (inlineInput) inlineInput.value = '';
+                if (standaloneInput) standaloneInput.value = '';
+            }
+
+            // Attach change listeners
+            if (inlineInput) {
+                inlineInput.addEventListener('change', function() {
+                    if (this.files && this.files[0]) showPreview(this.files[0]);
+                });
+            }
+            if (standaloneInput) {
+                standaloneInput.addEventListener('change', function() {
+                    if (this.files && this.files[0]) showPreview(this.files[0]);
+                });
+            }
+
+            // Remove button
+            if (removeBtn) {
+                removeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    hidePreview();
+                });
+            }
+
+            // Support pasting images (Ctrl+V / Cmd+V)
+            document.addEventListener('paste', function(e) {
+                var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (var i = 0; i < items.length; i++) {
+                    if (items[i].type.indexOf('image/') === 0) {
+                        var file = items[i].getAsFile();
+                        if (file && inlineInput) {
+                            var dt = new DataTransfer();
+                            dt.items.add(file);
+                            inlineInput.files = dt.files;
+                            showPreview(file);
+                        }
+                        break;
+                    }
+                }
             });
-            var badge = document.getElementById('imgConfirmBadge');
-            var thumbEl = document.getElementById('imgPreviewThumb');
-            if (badge) badge.style.display = 'none';
-            if (thumbEl) thumbEl.src = '';
-        }
 
-        // Smooth flow animation after form submit
+            // Make clearUpload globally available
+            window.clearUpload = hidePreview;
+        })();
+
+        // Fix: On form submit, disable the unused file input so duplicate name="job_image" doesn't cause issues
         var form = document.getElementById('jobForm');
         if (form) {
             form.addEventListener('submit', function() {
+                var theme = document.documentElement.getAttribute('data-theme');
+                var inlineFile = document.getElementById('fileUploadInline');
+                var standaloneFile = document.getElementById('fileUpload');
+
+                if (theme === 'chatgpt') {
+                    // In ChatGPT theme, disable standalone input
+                    if (standaloneFile) standaloneFile.disabled = true;
+                } else {
+                    // In other themes, disable inline input
+                    if (inlineFile) inlineFile.disabled = true;
+                }
+
+                // Smooth fade out
                 document.body.style.opacity = '0';
                 document.body.style.transform = 'translateY(-8px)';
                 document.body.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
