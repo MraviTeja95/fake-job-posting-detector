@@ -4,93 +4,148 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeRecruit AI - Fake Job Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=3">
 </head>
 
-<body>
-    <canvas id="particleCanvas"></canvas>
+<body class="main-page">
+    <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
-    <!-- PROFILE SECTION -->
-    <!-- ✅ FIX: use current_user (Flask-Login), not 'user' -->
     <div class="profile-wrapper">
+        <select id="themeSelector" class="theme-selector" aria-label="Select theme">
+            <option value="light">Classic Light</option>
+            <option value="dark">Midnight Dark</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="ocean">Ocean Blue</option>
+            <option value="hacker">Hacker Terminal</option>
+            <option value="solarized">Solarized Warm</option>
+            <option value="nothing">Nothing Theme</option>
+            <option value="glass">Glass UI</option>
+            <option value="chatgpt">ChatGPT Style</option>
+        </select>
         {% if current_user.is_authenticated %}
-        <div class="profile-box" onclick="toggleMenu()">
-            <div class="avatar">{{ current_user.username[0]|upper }}</div>
-            <div class="profile-info">
+        <button
+            type="button"
+            class="profile-box"
+            onclick="toggleMenu(this)"
+            aria-haspopup="true"
+            aria-expanded="false"
+            aria-controls="profileMenu"
+        >
+            <span class="avatar">{{ current_user.username[0]|upper }}</span>
+            <span class="profile-info">
                 <span class="username">{{ current_user.username }}</span>
-                <span class="status">Active</span>
-            </div>
-        </div>
-        <div id="profileMenu" class="profile-menu">
-            <a href="/history">📊 History</a>
-            <a href="/logout">🚪 Logout</a>
+                <span class="status">Active session</span>
+            </span>
+        </button>
+        <div id="profileMenu" class="profile-menu" role="menu">
+            <a href="/history" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128202;</span>History</a>
+            <a href="/logout" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128682;</span>Logout</a>
         </div>
         {% else %}
         <a href="/login" class="login-btn">Login</a>
         {% endif %}
     </div>
 
-    <!-- MAIN CONTAINER -->
-    <div class="container">
-        <div class="header-section">
-            <h1>🛡️ SafeRecruit AI</h1>
-            <p class="guide">Detect fake job postings in seconds</p>
-        </div>
+    <main class="container">
+        <section class="header-section" aria-labelledby="page-title">
+            <div class="brand-mark" aria-hidden="true">&#128737;</div>
+            <div class="header-copy">
+                <h1 id="page-title">SafeRecruit AI</h1>
+                <p id="chatgpt-center-title" style="display: none;">SafeRecruit AI</p>
+            </div>
+        </section>
 
         {% if not prediction %}
-        <!-- ANALYSIS FORM -->
-        <div class="form-section">
+        <section class="form-section" aria-label="Job analysis form">
             {% if error %}
-            <div class="error-box">{{ error }}</div>
+            <div class="error-box" role="alert">{{ error }}</div>
             {% endif %}
 
             <form method="POST" id="jobForm" enctype="multipart/form-data">
-                <div class="form-group">
-                    <label for="jobInput" class="form-label">Job Description or Link</label>
-                    <textarea
-                        id="jobInput"
-                        name="job_input"
-                        class="textarea-input"
-                        placeholder="Paste job description, LinkedIn link, or job posting text here...">
-                    </textarea>
+
+                <!-- ChatGPT prompt bar: upload + textarea inline -->
+                <div class="form-group chatgpt-input-wrapper">
+                    <!-- Image preview chip: shows above the input bar after upload -->
+                    <div id="imgConfirmBadge" class="img-confirm-badge" style="display:none;">
+                        <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="preview">
+                        <span id="imgConfirmName" class="img-confirm-name">image.png</span>
+                        <button type="button" onclick="clearUpload()" class="img-confirm-remove" title="Remove image">&times;</button>
+                    </div>
+
+                    <div class="chatgpt-bar">
+                        <div class="chatgpt-content-area">
+                            <textarea
+                                id="jobInput"
+                                name="job_input"
+                                class="textarea-input"
+                                rows="1"
+                                placeholder="Analyze a job posting for fraud signals..."
+                                style="overflow:hidden;"
+                                oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
+                            ></textarea>
+                        </div>
+
+                        <div class="chatgpt-actions-right">
+                            <label for="fileUploadInline" class="upload-label-inline" title="Upload screenshot">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                                <input type="file" id="fileUploadInline" name="job_image" accept="image/*" hidden
+                                    onchange="showImagePreview(this)">
+                            </label>
+                            <button type="submit" id="analyzeBtn" class="submit-btn chatgpt-send-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="form-group">
+                <!-- Standalone upload block for all other themes -->
+                <div class="form-group upload-label-standalone">
                     <label for="fileUpload" class="upload-label">
-                        <div class="upload-box">
-                            <div class="upload-icon">📸</div>
-                            <div class="upload-text">
+                        <span class="upload-box">
+                            <svg class="upload-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                            <span class="upload-text">
                                 <p>Upload Screenshot</p>
-                                <small>Optional - JPG, PNG up to 16MB</small>
-                            </div>
-                        </div>
+                                <small>Optional - JPG or PNG up to 16MB</small>
+                            </span>
+                        </span>
                         <input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
                     </label>
                 </div>
 
-                <button type="submit" id="analyzeBtn" class="submit-btn">
-                    <span id="btnText">🔍 Analyze Job</span>
-                    <span id="btnLoader" class="btn-loader" style="display:none;">⏳ Analyzing...</span>
+                <!-- Outside chatgpt theme: normal submit btn -->
+                <button type="submit" id="analyzeBtnDefault" class="submit-btn chatgpt-hide-btn">
+                    <span id="btnText" class="btn-content">
+                        <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                        <span>Analyze Job</span>
+                    </span>
+                    <span id="btnLoader" class="btn-loader" style="display: none;">
+                        <span class="btn-spinner" aria-hidden="true"></span>
+                        <span>Analyzing...</span>
+                    </span>
                 </button>
             </form>
 
-            <div id="loader" class="page-loader" style="display:none;">
-                <div class="spinner"></div>
+            <div id="loader" class="page-loader" style="display: none;" aria-live="polite">
+                <div class="spinner" aria-hidden="true"></div>
                 <p id="loaderText">Analyzing job description...</p>
             </div>
-        </div>
+        </section>
 
         {% else %}
-        <!-- RESULTS SECTION -->
-        <div class="results-section">
+        <section class="results-section" aria-label="Analysis results">
             <div class="result-card {{ prediction|lower }}">
-                <div class="result-header">
-                    {% if prediction == "FAKE" %}<span class="result-icon">⚠️</span>
-                    {% elif prediction == "REAL" %}<span class="result-icon">✅</span>
-                    {% else %}<span class="result-icon">❓</span>{% endif %}
+                <div class="result-main">
+                    <span class="result-icon" aria-hidden="true">
+                        {% if prediction == "FAKE" %}&#9888;&#65039;
+                        {% elif prediction == "REAL" %}&#10003;
+                        {% else %}?{% endif %}
+                    </span>
+                    <div>
+                        <p class="result-label">Prediction</p>
+                        <h2>{{ prediction }}</h2>
+                    </div>
                 </div>
-                <h2>{{ prediction }}</h2>
-                <div class="result-stats">
+                <div class="result-stats" aria-label="Prediction statistics">
                     <div class="stat">
                         <span class="stat-label">Confidence</span>
                         <span class="stat-value">{{ confidence }}%</span>
@@ -102,9 +157,16 @@
                 </div>
             </div>
 
+            {% if scraped_url %}
+            <div class="scraped-url-badge">
+                <span class="url-icon">🔗</span>
+                <span class="url-text">Scraped from: {{ scraped_url }}</span>
+            </div>
+            {% endif %}
+
             <div class="analysis-card">
-                <h3>📊 Risk Assessment</h3>
-                <div class="meter">
+                <h3><span class="section-icon" aria-hidden="true">&#128202;</span>Risk Assessment</h3>
+                <div class="meter" aria-hidden="true">
                     <div class="meter-bar" style="width: {{ risk }}%"></div>
                 </div>
                 <p class="risk-text">{{ risk }}% Scam Risk</p>
@@ -113,14 +175,14 @@
 
             {% if highlighted_text %}
             <div class="analysis-card">
-                <h3>📄 Job Description</h3>
+                <h3><span class="section-icon" aria-hidden="true">&#128196;</span>Job Description</h3>
                 <div class="text-preview">{{ highlighted_text|safe }}</div>
             </div>
             {% endif %}
 
             {% if reasons %}
             <div class="analysis-card">
-                <h3>🔍 Key Findings</h3>
+                <h3><span class="section-icon" aria-hidden="true">&#128269;</span>Key Findings</h3>
                 <ul class="findings-list">
                     {% for r in reasons %}
                     <li class="finding-item">{{ r }}</li>
@@ -131,7 +193,7 @@
 
             {% if suggestions %}
             <div class="analysis-card">
-                <h3>💡 Safety Tips</h3>
+                <h3><span class="section-icon" aria-hidden="true">&#128161;</span>Safety Tips</h3>
                 <ul class="tips-list">
                     {% for s in suggestions %}
                     <li class="tip-item">{{ s }}</li>
@@ -140,46 +202,132 @@
             </div>
             {% endif %}
 
-            {% if processed_image %}
+            {% if processed_image_url %}
             <div class="analysis-card">
-                <h3>🖼️ Screenshot Analysis</h3>
-                <img src="/static/processed.png?v={{ confidence }}" class="result-image">
+                <h3><span class="section-icon" aria-hidden="true">&#128444;</span>Screenshot Analysis</h3>
+                <img src="{{ processed_image_url }}" class="result-image" alt="Processed screenshot with highlighted risk signals">
             </div>
             {% endif %}
 
-            <div class="action-buttons">
-                <button onclick="location.href='/'" class="btn-secondary">← New Analysis</button>
-                <a href="/history" class="btn-secondary">📊 View History</a>
+            <div class="action-buttons hide-on-print">
+                <button type="button" onclick="location.href='/'" class="btn-secondary">
+                    <span aria-hidden="true">&larr;</span>
+                    <span>New Analysis</span>
+                </button>
+                <button type="button" onclick="window.print()" class="btn-secondary">
+                    <span aria-hidden="true">&#128424;</span>
+                    <span>Save as PDF</span>
+                </button>
+                <a href="/history" class="btn-secondary">
+                    <span aria-hidden="true">&#128202;</span>
+                    <span>View History</span>
+                </a>
+            </div>
+        </section>
+        {% endif %}
+    </main>
+
+    <!-- Chatbot Guide Widget -->
+    <div class="guide-widget-container">
+        <button id="guideBtn" class="guide-btn" onclick="toggleGuide()" aria-label="Open Guide">?</button>
+        <div id="guidePopup" class="guide-popup">
+            <div class="guide-header">
+                <h3>How to use SafeRecruit</h3>
+                <button onclick="toggleGuide()" class="close-guide">&times;</button>
+            </div>
+            <div class="guide-body">
+                <p><strong>1. Paste Text or Link:</strong> Drop the job description or a URL into the main text box.</p>
+                <p><strong>2. Upload Screenshot:</strong> If you have an image, use the upload feature to extract text from it.</p>
+                <p><strong>3. Analyze:</strong> Click 'Analyze Job' to check for modern scam indicators.</p>
             </div>
         </div>
-        {% endif %}
     </div>
 
-    <!-- ✅ FIX: script.js loaded first (it defines toggleMenu) -->
-    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=3"></script>
     <script>
-        // Handle analyze button state on submit
-        document.getElementById('jobForm')?.addEventListener('submit', function () {
-            document.getElementById('btnText').style.display = 'none';
-            document.getElementById('btnLoader').style.display = 'inline';
-            document.getElementById('analyzeBtn').disabled = true;
-        });
+        function toggleGuide() {
+            const popup = document.getElementById('guidePopup');
+            popup.classList.toggle('active');
+        }
 
-        // Close profile menu when clicking outside
-        document.addEventListener('click', function (e) {
-            const menu = document.getElementById('profileMenu');
-            const profileBox = document.querySelector('.profile-box');
-            if (menu && !profileBox?.contains(e.target)) {
-                menu.style.display = 'none';
+        // ChatGPT: show clean project name in center (no greeting)
+        (function() {
+            const el = document.getElementById('chatgpt-center-title');
+            if (el) el.style.display = 'block';
+        })();
+
+        // Upload image confirmation badge with thumbnail preview
+        function setupUploadConfirm(inputId) {
+            var input = document.getElementById(inputId);
+            if (!input) return;
+            input.addEventListener('change', function() {
+                var badge = document.getElementById('imgConfirmBadge');
+                var nameEl = document.getElementById('imgConfirmName');
+                var thumbEl = document.getElementById('imgPreviewThumb');
+                if (this.files && this.files[0]) {
+                    var file = this.files[0];
+                    var name = file.name;
+                    if (nameEl) nameEl.textContent = name.length > 22 ? name.slice(0, 20) + '...' : name;
+                    if (file.type.startsWith('image/')) {
+                        var reader = new FileReader();
+                        reader.onload = function(e) {
+                            if (thumbEl) thumbEl.src = e.target.result;
+                            if (badge) badge.style.display = 'flex';
+                        };
+                        reader.readAsDataURL(file);
+                    } else {
+                        if (thumbEl) thumbEl.src = '';
+                        if (badge) badge.style.display = 'flex';
+                    }
+                }
+            });
+        }
+        setupUploadConfirm('fileUploadInline');
+        setupUploadConfirm('fileUpload');
+
+        // Support pasting images directly into the textarea (ChatGPT style)
+        document.addEventListener('paste', function(e) {
+            var items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image/') === 0) {
+                    var file = items[i].getAsFile();
+                    if (file) {
+                        // Create a new DataTransfer to assign the file to the input
+                        var dt = new DataTransfer();
+                        dt.items.add(file);
+                        
+                        var inlineInput = document.getElementById('fileUploadInline');
+                        if (inlineInput) {
+                            inlineInput.files = dt.files;
+                            // Manually trigger the change event to show the preview
+                            var event = new Event('change', { bubbles: true });
+                            inlineInput.dispatchEvent(event);
+                        }
+                    }
+                    break;
+                }
             }
         });
 
-        // ✅ FIX: toggleMenu defined ONLY here (removed duplicate from old script.js)
-        function toggleMenu() {
-            const menu = document.getElementById('profileMenu');
-            if (menu) {
-                menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-            }
+        function clearUpload() {
+            ['fileUploadInline', 'fileUpload'].forEach(function(id) {
+                var el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            var badge = document.getElementById('imgConfirmBadge');
+            var thumbEl = document.getElementById('imgPreviewThumb');
+            if (badge) badge.style.display = 'none';
+            if (thumbEl) thumbEl.src = '';
+        }
+
+        // Smooth flow animation after form submit
+        var form = document.getElementById('jobForm');
+        if (form) {
+            form.addEventListener('submit', function() {
+                document.body.style.opacity = '0';
+                document.body.style.transform = 'translateY(-8px)';
+                document.body.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            });
         }
     </script>
 </body>

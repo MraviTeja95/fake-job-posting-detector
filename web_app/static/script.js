@@ -1,27 +1,35 @@
-// ==========================
-// Elements
-// ==========================
-const form      = document.getElementById("jobForm");
-const loader    = document.getElementById("loader");
-const loaderText = document.getElementById("loaderText"); // ✅ FIX: target the <p> not the container
-const button    = document.getElementById("analyzeBtn");
-const textarea  = document.querySelector("textarea");
+const form = document.getElementById("jobForm");
+const loader = document.getElementById("loader");
+const loaderText = document.getElementById("loaderText");
+const button = document.getElementById("analyzeBtn");
+const textarea = document.getElementById("jobInput");
 const fileInput = document.getElementById("fileUpload");
+const btnText = document.getElementById("btnText");
+const btnLoader = document.getElementById("btnLoader");
 
-// ==========================
-// Loading Animation
-// ==========================
+function setButtonLoading(btn, text) {
+    if (!btn) return;
+
+    const loadingText = text || btn.dataset.loadingText || "Working...";
+    btn.dataset.originalText = btn.dataset.originalText || btn.innerHTML;
+    btn.textContent = loadingText;
+    btn.disabled = true;
+}
+
 if (form) {
     form.addEventListener("submit", function () {
-        // ✅ FIX: show loader div (has spinner inside), NOT overwrite it with innerText
         if (loader) loader.style.display = "block";
         if (button) button.disabled = true;
+        if (btnText) btnText.style.display = "none";
+        if (btnLoader) btnLoader.style.display = "inline-flex";
 
-        // ✅ FIX: update only the text <p> inside the loader, preserving the spinner
         if (loaderText) {
-            if (fileInput && fileInput.files.length > 0) {
+            const hasFile = fileInput && fileInput.files.length > 0;
+            const textValue = (textarea?.value || "").toLowerCase();
+
+            if (hasFile) {
                 loaderText.textContent = "Extracting text from screenshot...";
-            } else if (textarea && textarea.value.includes("linkedin.com")) {
+            } else if (textValue.includes("linkedin.com")) {
                 loaderText.textContent = "Scanning LinkedIn profile...";
             } else {
                 loaderText.textContent = "Analyzing job description...";
@@ -30,106 +38,154 @@ if (form) {
     });
 }
 
-// ==========================
-// File Upload UI
-// ==========================
 if (fileInput) {
+    const uploadP = document.querySelector(".upload-text p");
+    const uploadBox = document.querySelector(".upload-box");
+    const defaultUploadText = uploadP?.textContent || "Upload Screenshot";
+
     fileInput.addEventListener("change", function () {
         const fileName = this.files[0]?.name;
-        // ✅ FIX: use .upload-text p selector (matches HTML structure)
-        const uploadP   = document.querySelector(".upload-text p");
-        const uploadBox = document.querySelector(".upload-box");
 
-        if (fileName) {
-            if (uploadP)   uploadP.textContent = fileName;
-            if (uploadBox) {
-                uploadBox.style.borderColor = "#22c55e";
-                uploadBox.style.boxShadow  = "0 0 20px rgba(34,197,94,0.35)";
-            }
-        }
+        if (uploadP) uploadP.textContent = fileName || defaultUploadText;
+        if (uploadBox) uploadBox.classList.toggle("is-selected", Boolean(fileName));
     });
 }
 
-// ==========================
-// Mouse Tracking (for particle glow)
-// ==========================
-let mouseX = window.innerWidth  / 2;
-let mouseY = window.innerHeight / 2;
+document.querySelectorAll("form").forEach((pageForm) => {
+    if (pageForm.id === "jobForm") return;
 
-document.addEventListener("mousemove", (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    pageForm.addEventListener("submit", function () {
+        const submitButton = pageForm.querySelector("button[type='submit']");
+        setButtonLoading(submitButton);
+    });
 });
 
-// ==========================
-// Risk Meter Animation
-// ==========================
-window.addEventListener("load", () => {
-    const meter = document.querySelector(".meter-bar");
-    if (meter) {
-        const finalWidth = meter.style.width;
-        meter.style.width = "0%";
-        setTimeout(() => { meter.style.width = finalWidth; }, 300);
+function setProfileMenu(open, trigger) {
+    const menu = document.getElementById("profileMenu");
+    const profileButton = trigger || document.querySelector(".profile-box");
+
+    if (!menu) return;
+
+    menu.classList.toggle("active", open);
+    if (profileButton) profileButton.setAttribute("aria-expanded", String(open));
+}
+
+window.toggleMenu = function (trigger) {
+    const menu = document.getElementById("profileMenu");
+    if (!menu) return;
+
+    const isOpen = menu.classList.contains("active");
+    setProfileMenu(!isOpen, trigger);
+};
+
+document.addEventListener("click", function (event) {
+    if (!event.target.closest(".profile-wrapper")) {
+        setProfileMenu(false);
     }
 });
 
-// ==========================
-// Particle Background
-// ==========================
+document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") {
+        setProfileMenu(false);
+    }
+});
+
+window.addEventListener("load", () => {
+    const meter = document.querySelector(".meter-bar");
+    if (!meter) return;
+
+    const finalWidth = meter.style.width;
+    meter.style.width = "0%";
+
+    requestAnimationFrame(() => {
+        window.setTimeout(() => {
+            meter.style.width = finalWidth;
+        }, 180);
+    });
+});
+
 const canvas = document.getElementById("particleCanvas");
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-if (canvas) {
+if (canvas && !reduceMotion) {
     const ctx = canvas.getContext("2d");
-    canvas.width  = window.innerWidth;
-    canvas.height = window.innerHeight;
-
-    const particleCount = 100;
-    const particles = [];
+    let mouseX = window.innerWidth / 2;
+    let mouseY = window.innerHeight / 2;
+    let particles = [];
 
     class Particle {
         constructor() {
-            this.x  = Math.random() * canvas.width;
-            this.y  = Math.random() * canvas.height;
-            this.vx = (Math.random() - 0.5) * 1;
-            this.vy = (Math.random() - 0.5) * 1;
+            this.reset(true);
+        }
+
+        reset(randomizePosition) {
+            this.x = randomizePosition ? Math.random() * window.innerWidth : window.innerWidth / 2;
+            this.y = randomizePosition ? Math.random() * window.innerHeight : window.innerHeight / 2;
+            this.vx = (Math.random() - 0.5) * 0.45;
+            this.vy = (Math.random() - 0.5) * 0.45;
+            this.size = 1.2 + Math.random() * 1.5;
+            this.alpha = 0.18 + Math.random() * 0.22;
         }
 
         move() {
             this.x += this.vx;
             this.y += this.vy;
-            if (this.x < 0 || this.x > canvas.width)  this.vx *= -1;
-            if (this.y < 0 || this.y > canvas.height) this.vy *= -1;
+
+            if (this.x < -20) this.x = window.innerWidth + 20;
+            if (this.x > window.innerWidth + 20) this.x = -20;
+            if (this.y < -20) this.y = window.innerHeight + 20;
+            if (this.y > window.innerHeight + 20) this.y = -20;
         }
 
-        draw() {
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, 2, 0, Math.PI * 2);
-            ctx.fillStyle = "rgba(0,0,0,0.4)";
-            ctx.fill();
-
+        draw(pColor, pGlow) {
             const dx = this.x - mouseX;
             const dy = this.y - mouseY;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < 150) {
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, 2.5, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(0,0,0,${(1 - dist / 150) * 0.6})`;
-                ctx.fill();
-            }
+            const lift = dist < 150 ? (1 - dist / 150) * 0.35 : 0;
+
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size + lift, 0, Math.PI * 2);
+
+            ctx.fillStyle = `rgba(${pColor}, ${this.alpha + lift})`;
+            ctx.shadowBlur = pGlow;
+            if (pGlow > 0) ctx.shadowColor = `rgba(${pColor}, 0.6)`;
+
+            ctx.fill();
+            ctx.shadowBlur = 0;
         }
     }
 
-    for (let i = 0; i < particleCount; i++) particles.push(new Particle());
+    function resizeCanvas() {
+        const ratio = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(window.innerWidth * ratio);
+        canvas.height = Math.floor(window.innerHeight * ratio);
+        canvas.style.width = `${window.innerWidth}px`;
+        canvas.style.height = `${window.innerHeight}px`;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
 
-    function connectParticles() {
+        const particleCount = Math.max(48, Math.min(110, Math.floor(window.innerWidth * window.innerHeight / 16000)));
+        particles = Array.from({ length: particleCount }, () => new Particle());
+    }
+
+    function connectParticles(pColor, pGlow) {
         for (let i = 0; i < particles.length; i++) {
             for (let j = i + 1; j < particles.length; j++) {
                 const dx = particles[i].x - particles[j].x;
                 const dy = particles[i].y - particles[j].y;
-                if (Math.sqrt(dx * dx + dy * dy) < 120) {
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 118) {
                     ctx.beginPath();
-                    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+                    ctx.strokeStyle = `rgba(${pColor}, ${(1 - dist / 118) * 0.15})`;
                     ctx.lineWidth = 1;
+
+                    if (pGlow > 0) {
+                        ctx.shadowBlur = pGlow / 2;
+                        ctx.shadowColor = `rgba(${pColor}, 0.4)`;
+                    } else {
+                        ctx.shadowBlur = 0;
+                    }
+
                     ctx.moveTo(particles[i].x, particles[i].y);
                     ctx.lineTo(particles[j].x, particles[j].y);
                     ctx.stroke();
@@ -138,20 +194,86 @@ if (canvas) {
         }
     }
 
+    let cachedPColor = '23, 23, 23';
+    let cachedPGlow = 0;
+    let frameCount = 0;
+
     function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        particles.forEach(p => { p.move(); p.draw(); });
-        connectParticles();
+        if (frameCount % 30 === 0) {
+            const styles = getComputedStyle(document.documentElement);
+            cachedPColor = styles.getPropertyValue('--particle-color').trim() || '23, 23, 23';
+            cachedPGlow = parseInt(styles.getPropertyValue('--particle-glow').trim() || '0');
+        }
+        frameCount++;
+
+        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+        particles.forEach((particle) => {
+            particle.move();
+            particle.draw(cachedPColor, cachedPGlow);
+        });
+        connectParticles(cachedPColor, cachedPGlow);
         requestAnimationFrame(animate);
     }
 
-    animate();
-
-    window.addEventListener("resize", () => {
-        canvas.width  = window.innerWidth;
-        canvas.height = window.innerHeight;
+    document.addEventListener("mousemove", (event) => {
+        mouseX = event.clientX;
+        mouseY = event.clientY;
     });
+
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+    animate();
 }
 
-// ✅ NOTE: toggleMenu is defined in index.html <script> block only.
-//    It is NOT defined here to avoid duplicate function conflicts.
+// Theme Selector Logic
+document.addEventListener("DOMContentLoaded", () => {
+    const themeSelector = document.getElementById("themeSelector");
+
+    if (!themeSelector) return;
+
+    // Check localStorage for theme
+    const currentTheme = localStorage.getItem("theme") || "light";
+    if (currentTheme !== "light") {
+        document.documentElement.setAttribute("data-theme", currentTheme);
+    }
+    themeSelector.value = currentTheme;
+
+    themeSelector.addEventListener("change", (e) => {
+        const theme = e.target.value;
+        if (theme === "light") {
+            document.documentElement.removeAttribute("data-theme");
+        } else {
+            document.documentElement.setAttribute("data-theme", theme);
+        }
+        localStorage.setItem("theme", theme);
+    });
+
+    // History Filter Logic
+    const historySearch = document.getElementById("historySearch");
+    const historyFilter = document.getElementById("historyFilter");
+    const historyItems = document.querySelectorAll(".history-item");
+
+    function filterHistory() {
+        if (!historySearch || !historyFilter) return;
+
+        const searchTerm = historySearch.value.toLowerCase();
+        const filterType = historyFilter.value;
+
+        historyItems.forEach(item => {
+            const textContent = item.textContent.toLowerCase();
+            const predictionBadge = item.querySelector(".prediction-badge").textContent.toUpperCase();
+
+            const matchesSearch = textContent.includes(searchTerm);
+            const matchesType = filterType === "ALL" || predictionBadge === filterType;
+
+            if (matchesSearch && matchesType) {
+                item.style.display = "block";
+            } else {
+                item.style.display = "none";
+            }
+        });
+    }
+
+    if (historySearch) historySearch.addEventListener("input", filterHistory);
+    if (historyFilter) historyFilter.addEventListener("change", filterHistory);
+});

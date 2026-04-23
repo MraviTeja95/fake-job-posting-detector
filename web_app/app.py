@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, make_response, send_from_directory
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
@@ -6,11 +6,14 @@ import re
 import json
 from werkzeug.utils import secure_filename
 from datetime import datetime
+import requests
+from bs4 import BeautifulSoup
+import functools
 
 app = Flask(__name__)
 app.secret_key = "secret123"
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
-app.config['UPLOAD_FOLDER'] = 'uploads'
+app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
 USERS_FILE = 'users.json'
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
@@ -21,18 +24,28 @@ login_manager.init_app(app)
 login_manager.login_view = "login"
 
 # ===== USER MANAGEMENT FUNCTIONS =====
+_USER_CACHE = None
+
 def load_users():
-    """Load users from JSON file."""
+    """Load users from JSON file with in-memory caching."""
+    global _USER_CACHE
+    if _USER_CACHE is not None:
+        return _USER_CACHE
+
     if os.path.exists(USERS_FILE):
         try:
             with open(USERS_FILE, 'r') as f:
-                return json.load(f)
+                _USER_CACHE = json.load(f)
+                return _USER_CACHE
         except:
-            return {}
-    return {}
+            pass
+    _USER_CACHE = {}
+    return _USER_CACHE
 
 def save_users(users):
-    """Save users to JSON file."""
+    """Save users to JSON file and update cache."""
+    global _USER_CACHE
+    _USER_CACHE = users
     with open(USERS_FILE, 'w') as f:
         json.dump(users, f, indent=2)
 
@@ -68,6 +81,24 @@ def load_user(user_id):
         return User(user_id)
     return None
 
+@functools.lru_cache(maxsize=128)
+def scrape_url_text(url):
+    """Scrape and extract text from a URL, with caching to improve performance."""
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+    response = requests.get(url, headers=headers, timeout=10)
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, 'html.parser')
+    
+    # Remove script and style elements
+    for script in soup(["script", "style", "nav", "footer", "header"]):
+        script.extract()
+        
+    # Get text
+    text = soup.get_text(separator=' ')
+    lines = (line.strip() for line in text.splitlines())
+    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+    return '\n'.join(chunk for chunk in chunks if chunk)
+
 def analyze_job_description(text):
     if not text or len(text.strip()) < 10:
         return {
@@ -82,22 +113,29 @@ def analyze_job_description(text):
     # Red flags with severity weights
     red_flags = {
         # Payment-related (highest risk)
-        "upfront payment": 0.35, "wire transfer": 0.40, "bitcoin": 0.40,
-        "western union": 0.40, "gift card": 0.35, "itunes card": 0.35,
+        "upfront payment": 0.40, "wire transfer": 0.45, "bitcoin": 0.45,
+        "western union": 0.45, "gift card": 0.40, "itunes card": 0.40,
+        "cash app": 0.40, "venmo": 0.40, "paypal": 0.35, "crypto": 0.40,
+        "security deposit": 0.45, "starter kit": 0.40, "equipment fee": 0.45,
+
+        # Communication (high risk)
+        "whatsapp": 0.35, "telegram": 0.35,
 
         # Work patterns (medium-high risk)
-        "no experience": 0.20, "no qualifications": 0.25, "no cv needed": 0.25,
-        "no interview": 0.25, "immediate hire": 0.20, "immediate start": 0.20,
+        "no experience": 0.25, "no qualifications": 0.25, "no cv needed": 0.30,
+        "no interview": 0.30, "immediate hire": 0.25, "immediate start": 0.25,
+        "data entry": 0.15, "envelope stuffing": 0.25, "package handler": 0.15,
+        "reshipping": 0.35,
 
         # Financial promises (high risk)
-        "guaranteed income": 0.35, "quick money": 0.35, "easy money": 0.35,
-        "guaranteed income": 0.35, "risk-free": 0.30, "work from anywhere": 0.10,
+        "guaranteed income": 0.40, "quick money": 0.40, "easy money": 0.40,
+        "risk-free": 0.35, "work from anywhere": 0.10,
 
         # Urgency/pressure tactics (medium risk)
-        "urgent": 0.15, "limited time": 0.15, "act now": 0.15, "don't delay": 0.15,
+        "urgent": 0.20, "limited time": 0.20, "act now": 0.20, "don't delay": 0.20,
 
         # Unrealistic pay (low-medium risk)
-        "high salary": 0.10, "lucrative": 0.05, "earn $": 0.08,
+        "high salary": 0.10, "lucrative": 0.10, "earn $": 0.10,
     }
 
     # Legitimate indicators (reduce risk)
@@ -136,7 +174,7 @@ def analyze_job_description(text):
     risk_percentage = int(risk_score * 100)
 
     # Determine prediction
-    if risk_percentage > 65:
+    if risk_percentage > 55:
         prediction = "FAKE"
         confidence = min(95, risk_percentage)
         category = "🚨 High Risk"
@@ -195,71 +233,97 @@ def extract_text_from_image(image_path):
     except Exception as e:
         return None
 
-def highlight_keywords_in_image(image_path, keywords):
+def normalize_ocr_text(text):
+    """Normalize OCR words so punctuation does not block keyword matching."""
+    return re.sub(r"[^a-z0-9]+", "", text.lower())
+
+def highlight_keywords_in_image(image_path, keywords, output_path):
     """Draw red highlights on keywords found in the image."""
     try:
-        from PIL import Image, ImageDraw, ImageFont
+        from PIL import Image, ImageDraw
         import pytesseract
 
         if not os.path.exists(image_path):
             return False
 
-        # Open image
-        img = Image.open(image_path)
-        draw = ImageDraw.Draw(img)
+        img = Image.open(image_path).convert('RGBA')
 
         # Get detailed OCR data with bounding boxes
         data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
 
-        # For each word in the OCR results
-        highlighted = False
-        for i in range(len(data['text'])):
-            word = data['text'][i].lower().strip()
+        words = []
+        for i, raw_word in enumerate(data['text']):
+            normalized_word = normalize_ocr_text(raw_word)
+            if not normalized_word:
+                continue
 
-            # Check if word matches any keyword
-            for keyword in keywords:
-                if keyword.lower() in word:
-                    # Get bounding box
-                    x = data['left'][i]
-                    y = data['top'][i]
-                    w = data['width'][i]
-                    h = data['height'][i]
+            words.append({
+                "text": normalized_word,
+                "left": data['left'][i],
+                "top": data['top'][i],
+                "width": data['width'][i],
+                "height": data['height'][i],
+            })
 
-                    # Draw red rectangle with border
-                    # Coordinates: (left, top, right, bottom)
-                    draw.rectangle(
-                        [x, y, x + w, y + h],
-                        outline='red',
-                        width=3
-                    )
+        highlight_boxes = []
+        keyword_tokens = [
+            [normalize_ocr_text(token) for token in keyword.split() if normalize_ocr_text(token)]
+            for keyword in keywords
+        ]
 
-                    # Add semi-transparent red background
-                    # Create a new image for transparency effect
-                    overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-                    overlay_draw = ImageDraw.Draw(overlay)
-                    overlay_draw.rectangle(
-                        [x, y, x + w, y + h],
-                        fill=(255, 0, 0, 80)  # Red with 80/255 transparency
-                    )
-                    img = Image.alpha_composite(img.convert('RGBA'), overlay).convert('RGB')
-                    draw = ImageDraw.Draw(img)
+        for start_index in range(len(words)):
+            for tokens in keyword_tokens:
+                if not tokens or start_index + len(tokens) > len(words):
+                    continue
 
-                    highlighted = True
-                    break
+                candidate = words[start_index:start_index + len(tokens)]
+                is_match = all(
+                    token == word["text"] or token in word["text"] or word["text"] in token
+                    for token, word in zip(tokens, candidate)
+                )
 
-        # Save the marked image
-        processed_path = os.path.join(app.config['UPLOAD_FOLDER'], 'processed.png')
-        img.save(processed_path)
-        return highlighted
+                if is_match:
+                    highlight_boxes.extend(candidate)
+
+        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
+        overlay_draw = ImageDraw.Draw(overlay)
+
+        for box in highlight_boxes:
+            padding = 4
+            x1 = max(0, box["left"] - padding)
+            y1 = max(0, box["top"] - padding)
+            x2 = min(img.width, box["left"] + box["width"] + padding)
+            y2 = min(img.height, box["top"] + box["height"] + padding)
+            overlay_draw.rectangle([x1, y1, x2, y2], fill=(217, 64, 53, 78))
+
+        img = Image.alpha_composite(img, overlay).convert('RGB')
+        draw = ImageDraw.Draw(img)
+
+        for box in highlight_boxes:
+            padding = 4
+            x1 = max(0, box["left"] - padding)
+            y1 = max(0, box["top"] - padding)
+            x2 = min(img.width, box["left"] + box["width"] + padding)
+            y2 = min(img.height, box["top"] + box["height"] + padding)
+            draw.rectangle([x1, y1, x2, y2], outline=(217, 64, 53), width=3)
+
+        img.save(output_path)
+        return bool(highlight_boxes)
 
     except Exception as e:
         return False
+
+@app.route("/uploads/<path:filename>")
+@login_required
+def uploaded_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def home():
     prediction = confidence = risk = category = reasons = suggestions = highlighted_text = error = None
-    processed_image = False
+    processed_image_url = None
+    scraped_url = None
 
     if request.method == "POST":
         job_input = request.form.get("job_input", "").strip()
@@ -270,23 +334,42 @@ def home():
                 filename = secure_filename(job_image.filename)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 job_image.save(filepath)
+                
+                # Provide the original image to be displayed in the results unconditionally
+                processed_image_url = url_for("uploaded_file", filename=filename)
+                
                 extracted = extract_text_from_image(filepath)
                 if extracted:
                     job_input = extracted
-                    processed_image = True
 
                     # Highlight keywords in the screenshot image
                     keywords_to_highlight = [
                         "upfront", "bitcoin", "western union", "wire transfer", "gift card",
                         "urgent", "immediate", "immediate start", "no interview", "no experience",
                         "guaranteed income", "quick money", "easy money", "risk-free",
-                        "itunes card", "no cv needed", "act now", "don't delay", "limited time"
+                        "itunes card", "no cv needed", "act now", "don't delay", "limited time",
+                        "whatsapp", "telegram", "cash app", "venmo", "paypal", "crypto",
+                        "security deposit", "starter kit", "equipment fee", "reshipping"
                     ]
-                    highlight_keywords_in_image(filepath, keywords_to_highlight)
+                    processed_filename = f"processed_{datetime.now().strftime('%Y%m%d%H%M%S%f')}.png"
+                    processed_path = os.path.join(app.config['UPLOAD_FOLDER'], processed_filename)
+                    if highlight_keywords_in_image(filepath, keywords_to_highlight, processed_path):
+                        if os.path.exists(processed_path):
+                            processed_image_url = url_for("uploaded_file", filename=processed_filename)
                 else:
-                    error = "Could not extract text from image. Please paste text instead."
+                    if not job_input: # Only show error if no text was provided at all
+                        error = "Could not extract text from image. Please paste text instead."
             except Exception as e:
                 error = f"Error processing image: {str(e)}"
+
+        if job_input:
+            if job_input.startswith("http://") or job_input.startswith("https://"):
+                try:
+                    scraped_url = job_input
+                    job_input = scrape_url_text(job_input)
+                except Exception as e:
+                    error = f"Error scraping URL: {str(e)}"
+                    job_input = None
 
         if job_input:
             result = analyze_job_description(job_input)
@@ -303,7 +386,9 @@ def home():
                 "upfront", "bitcoin", "western union", "wire transfer", "gift card",
                 "urgent", "immediate", "immediate start", "no interview", "no experience",
                 "guaranteed income", "quick money", "easy money", "risk-free",
-                "itunes card", "no cv needed", "act now", "don't delay", "limited time"
+                "itunes card", "no cv needed", "act now", "don't delay", "limited time",
+                "whatsapp", "telegram", "cash app", "venmo", "paypal", "crypto",
+                "security deposit", "starter kit", "equipment fee", "reshipping"
             ]
 
             for kw in keywords_to_highlight:
@@ -328,7 +413,8 @@ def home():
     return render_template("index.html",
         prediction=prediction, confidence=confidence, risk=risk,
         category=category, reasons=reasons, suggestions=suggestions,
-        highlighted_text=highlighted_text, processed_image=processed_image, error=error
+        highlighted_text=highlighted_text, processed_image_url=processed_image_url, error=error,
+        scraped_url=scraped_url
     )
 
 @app.route("/login", methods=["GET", "POST"])

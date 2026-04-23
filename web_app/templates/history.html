@@ -1,73 +1,102 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>History - SafeRecruit AI</title>
-<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>History - SafeRecruit AI</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
-<body>
+<body class="history-page">
+    <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
-<canvas id="particleCanvas"></canvas>
+    <div class="profile-wrapper">
+        <select id="themeSelector" class="theme-selector" aria-label="Select theme">
+            <option value="light">Classic Light</option>
+            <option value="dark">Midnight Dark</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="ocean">Ocean Blue</option>
+            <option value="hacker">Hacker Terminal</option>
+            <option value="solarized">Solarized Warm</option>
+            <option value="nothing">Nothing Theme</option>
+            <option value="glass">Glass UI</option>
+            <option value="chatgpt">ChatGPT Style</option>
+        </select>
+        <button type="button" class="profile-box" onclick="location.href='/logout'">
+            <span class="avatar" style="width: 36px; height: 36px; font-size: 0.9rem;">{{ current_user.username[0]|upper }}</span>
+            <span class="profile-info" style="margin-right: 8px;">
+                <span class="username" style="font-size: 0.8rem;">Logout</span>
+            </span>
+        </button>
+    </div>
 
-<div class="container">
+    <main class="container">
+        <section class="header-section" aria-labelledby="history-title">
+            <div class="brand-mark" aria-hidden="true">&#128202;</div>
+            <div class="header-copy">
+                <p class="eyebrow">Previous scans</p>
+                <h1 id="history-title">Your Scan History</h1>
+                <p class="guide">Review recent fake-job analyses saved in this session.</p>
+            </div>
+        </section>
 
-<h1>📊 Your Scan History</h1>
+        <section class="form-section history-panel" aria-label="Scan history">
+            {% if data %}
+            <div class="history-controls" style="margin-bottom: 24px; display: flex; gap: 16px;">
+                <input type="text" id="historySearch" placeholder="Search history..." style="flex: 1; padding: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 600;">
+                <select id="historyFilter" style="padding: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 600; cursor: pointer;">
+                    <option value="ALL">All Types</option>
+                    <option value="FAKE">Fake Only</option>
+                    <option value="SUSPICIOUS">Suspicious Only</option>
+                    <option value="REAL">Real Only</option>
+                </select>
+            </div>
+            
+            <div class="history-list">
+                {% for item in data %}
+                <article class="history-item">
+                    <header class="history-item-header">
+                        <span class="history-time">{{ item.timestamp }}</span>
+                        <span class="prediction-badge {{ item.prediction|lower }}">{{ item.prediction }}</span>
+                    </header>
 
-<p class="guide">View all your previous job posting analyses</p>
+                    <p class="history-description">
+                        <strong>Description:</strong> {{ item.input_text }}
+                    </p>
 
-{% if data %}
+                    <div class="history-meta-grid">
+                        <div class="history-meta">
+                            <span>Category</span>
+                            <strong>{{ item.category }}</strong>
+                        </div>
+                        <div class="history-meta">
+                            <span>Risk</span>
+                            <strong>{{ item.risk }}/100</strong>
+                        </div>
+                        <div class="history-meta">
+                            <span>Confidence</span>
+                            <strong>{{ item.confidence }}%</strong>
+                        </div>
+                    </div>
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <div class="empty-state-icon" aria-hidden="true">&#128203;</div>
+                <p>No history found. Start analyzing job postings to build your scan timeline.</p>
+            </div>
+            {% endif %}
 
-<div style="margin-top: 20px;">
+            <div class="action-buttons">
+                <button type="button" onclick="location.href='/'" class="btn-secondary">
+                    <span aria-hidden="true">&larr;</span>
+                    <span>Back to Analysis</span>
+                </button>
+            </div>
+        </section>
+    </main>
 
-{% for item in data %}
-<div class="analysis history-item">
-
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-    <span style="font-weight: 600; color: #2c3e50;">{{ item.timestamp }}</span>
-    <span class="prediction-badge {{ item.prediction|lower }}">{{ item.prediction }}</span>
-</div>
-
-<p style="margin: 8px 0; color: #555;">
-<strong>Description:</strong> {{ item.input_text }}
-</p>
-
-<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-    <p style="margin: 0; background: rgba(52, 152, 219, 0.1); padding: 8px; border-radius: 5px;">
-        <strong>Category:</strong> {{ item.category }}
-    </p>
-    <p style="margin: 0; background: rgba(52, 152, 219, 0.1); padding: 8px; border-radius: 5px;">
-        <strong>Risk:</strong> {{ item.risk }}/100
-    </p>
-</div>
-
-<div style="margin-top: 10px; background: rgba(0, 0, 0, 0.05); padding: 8px; border-radius: 5px;">
-    <strong>Confidence:</strong> {{ item.confidence }}%
-</div>
-
-</div>
-{% endfor %}
-
-</div>
-
-{% else %}
-
-<div class="analysis">
-<p style="color: #999; font-size: 16px; padding: 30px;">
-📭 No history found. Start analyzing job postings!
-</p>
-</div>
-
-{% endif %}
-
-<div style="margin-top: 30px; display: flex; gap: 10px;">
-<button onclick="location.href='/'" class="back-btn" style="flex: 1; background: linear-gradient(135deg, #3498db, #2980b9);">⬅ Back to Analysis</button>
-</div>
-
-</div>
-
-<script src="{{ url_for('static', filename='script.js') }}"></script>
-
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

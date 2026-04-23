@@ -3,127 +3,41 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register – SafeRecruit AI</title>
+    <title>Register - SafeRecruit AI</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <style>
-        body {
-            padding-top: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-        }
-
-        .login-wrapper {
-            width: 100%;
-            max-width: 420px;
-            padding: 20px;
-            animation: fadeUp 0.45s ease both;
-        }
-
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .login-card {
-            background: rgba(255,255,255,0.97);
-            backdrop-filter: blur(30px);
-            border-radius: 24px;
-            padding: 44px 40px 36px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.12);
-            border: 1px solid rgba(255,255,255,0.8);
-        }
-
-        .login-logo  { text-align:center; font-size:2.6em; margin-bottom:6px; }
-        .login-title { text-align:center; font-size:1.5em; font-weight:700; color:#1a1a1a; margin-bottom:4px; }
-        .login-sub   { text-align:center; font-size:13px; color:#999; margin-bottom:32px; }
-
-        .field-label {
-            display: block;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.8px;
-            color: #666;
-            margin-bottom: 6px;
-        }
-
-        .field-group { margin-bottom: 18px; }
-        .field-group input { margin: 0; }
-
-        .btn-login {
-            width: 100%;
-            padding: 14px;
-            border: none;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #1a1a1a, #3a3a3a);
-            color: white;
-            font-weight: 700;
-            font-size: 15px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin-top: 6px;
-            letter-spacing: 0.3px;
-        }
-
-        .btn-login:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.22);
-        }
-
-        .btn-login:disabled {
-            opacity: 0.65;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .login-note {
-            text-align: center;
-            font-size: 12px;
-            color: #bbb;
-            margin-top: 22px;
-            line-height: 1.6;
-        }
-
-        /* override global error-box for login page */
-        .error-box {
-            font-size: 13px;
-            margin-bottom: 20px;
-        }
-
-        .success-box {
-            font-size: 13px;
-            margin-bottom: 20px;
-            background-color: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 8px;
-            border: 1px solid #c3e6cb;
-        }
-    </style>
 </head>
-<body>
-    <canvas id="particleCanvas"></canvas>
+<body class="auth-page">
+    <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
-    <div class="login-wrapper">
-        <div class="login-card">
+    <div class="profile-wrapper">
+        <select id="themeSelector" class="theme-selector" aria-label="Select theme">
+            <option value="light">Classic Light</option>
+            <option value="dark">Midnight Dark</option>
+            <option value="cyberpunk">Cyberpunk</option>
+            <option value="ocean">Ocean Blue</option>
+            <option value="hacker">Hacker Terminal</option>
+            <option value="solarized">Solarized Warm</option>
+            <option value="nothing">Nothing Theme</option>
+            <option value="glass">Glass UI</option>
+            <option value="chatgpt">ChatGPT Style</option>
+        </select>
+    </div>
 
-            <div class="login-logo">🛡️</div>
-            <h1 class="login-title">SafeRecruit AI</h1>
-            <p class="login-sub">Create your account</p>
+    <main class="login-wrapper">
+        <section class="login-card" aria-labelledby="signup-title">
+            <div class="brand-mark login-logo" aria-hidden="true">&#128737;</div>
+            <h1 class="login-title" id="signup-title">SafeRecruit AI</h1>
 
             {% if error %}
-            <div class="error-box">⚠️ {{ error }}</div>
+            <div class="error-box" role="alert">&#9888;&#65039; {{ error }}</div>
             {% endif %}
 
             {% if success %}
-            <div class="success-box">✅ {{ success }}</div>
+            <div class="success-box" role="status">&#10003; {{ success }}</div>
             {% endif %}
 
             <form method="POST" id="signupForm">
                 <div class="field-group">
-                    <label class="field-label" for="username">Username</label>
                     <input
                         type="text"
                         id="username"
@@ -136,7 +50,6 @@
                 </div>
 
                 <div class="field-group">
-                    <label class="field-label" for="password">Password</label>
                     <input
                         type="password"
                         id="password"
@@ -148,7 +61,6 @@
                 </div>
 
                 <div class="field-group">
-                    <label class="field-label" for="confirm_password">Confirm Password</label>
                     <input
                         type="password"
                         id="confirm_password"
@@ -159,25 +71,20 @@
                     >
                 </div>
 
-                <button type="submit" class="btn-login" id="signupBtn">
-                    Create Account →
+                <button type="submit" class="btn-login" id="signupBtn" data-loading-text="Creating account...">
+                    <span>Create Account</span>
+                    <span aria-hidden="true">&rarr;</span>
                 </button>
             </form>
 
             <p class="login-note">
-                Already have an account? <a href="/login" style="color: #1a1a1a; font-weight: 600; text-decoration: none;">Login here</a><br>
+                Already have an account?
+                <a href="/login" class="auth-link">Login here</a><br>
                 Your data is secure and private.
             </p>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-    <script>
-        document.getElementById('signupForm').addEventListener('submit', function () {
-            const btn = document.getElementById('signupBtn');
-            btn.textContent = 'Creating account…';
-            btn.disabled = true;
-        });
-    </script>
 </body>
 </html>
