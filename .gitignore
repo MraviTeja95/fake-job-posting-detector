@@ -27,10 +27,8 @@ ENV/
 # Sensitive user data
 users.json
 web_app/users.json
-
-# Uploaded & processed images (runtime artifacts)
-web_app/uploads/processed_*.png
-web_app/test_img.png
+web_app/history/
+web_app/uploads/
 
 # Environment variables
 .env

@@ -11,17 +11,6 @@
     <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
-        <select id="themeSelector" class="theme-selector" aria-label="Select theme">
-            <option value="light">Classic Light</option>
-            <option value="dark">Midnight Dark</option>
-            <option value="cyberpunk">Cyberpunk</option>
-            <option value="ocean">Ocean Blue</option>
-            <option value="hacker">Hacker Terminal</option>
-            <option value="solarized">Solarized Warm</option>
-            <option value="nothing">Nothing Theme</option>
-            <option value="glass">Glass UI</option>
-            <option value="chatgpt">ChatGPT Style</option>
-        </select>
         <button type="button" class="profile-box" onclick="location.href='/logout'">
             <span class="avatar" style="width: 36px; height: 36px; font-size: 0.9rem;">{{ current_user.username[0]|upper }}</span>
             <span class="profile-info" style="margin-right: 8px;">
@@ -32,10 +21,9 @@
 
     <main class="container">
         <section class="header-section" aria-labelledby="history-title">
-            <div class="brand-mark" aria-hidden="true">&#128202;</div>
             <div class="header-copy">
                 <p class="eyebrow">Previous scans</p>
-                <h1 id="history-title">Your Scan History</h1>
+                <h1 id="history-title">SafeRecruit History</h1>
                 <p class="guide">Review recent fake-job analyses saved in this session.</p>
             </div>
         </section>
@@ -43,8 +31,8 @@
         <section class="form-section history-panel" aria-label="Scan history">
             {% if data %}
             <div class="history-controls" style="margin-bottom: 24px; display: flex; gap: 16px;">
-                <input type="text" id="historySearch" placeholder="Search history..." style="flex: 1; padding: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 600;">
-                <select id="historyFilter" style="padding: 12px; border: 2px solid var(--ink); background: var(--surface); color: var(--ink); font-weight: 600; cursor: pointer;">
+                <input type="text" id="historySearch" placeholder="Search history..." style="flex: 1; padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); color: var(--ink); font-weight: 600;">
+                <select id="historyFilter" style="padding: 12px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-strong); color: var(--ink); font-weight: 600; cursor: pointer;">
                     <option value="ALL">All Types</option>
                     <option value="FAKE">Fake Only</option>
                     <option value="SUSPICIOUS">Suspicious Only</option>
@@ -57,7 +45,14 @@
                 <article class="history-item">
                     <header class="history-item-header">
                         <span class="history-time">{{ item.timestamp }}</span>
-                        <span class="prediction-badge {{ item.prediction|lower }}">{{ item.prediction }}</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            {% if item.engine == 'LLM' or item.engine is not defined %}
+                            <span class="engine-badge engine-llm" title="Analyzed by Llama-3.1-70B">&#129302; LLM</span>
+                            {% else %}
+                            <span class="engine-badge engine-rule" title="Analyzed by rule-based system">&#128268; Rules</span>
+                            {% endif %}
+                            <span class="prediction-badge {{ item.prediction|lower }}">{{ item.prediction }}</span>
+                        </div>
                     </header>
 
                     <p class="history-description">
@@ -84,7 +79,9 @@
             {% else %}
             <div class="empty-state">
                 <div class="empty-state-icon" aria-hidden="true">&#128203;</div>
-                <p>No history found. Start analyzing job postings to build your scan timeline.</p>
+                <h3 style="margin: 12px 0 8px; font-size:1.2rem;">No scans yet</h3>
+                <p>Start analyzing job postings to build your personal scan history. Every analysis is saved here permanently.</p>
+                <a href="/" class="btn-secondary" style="margin-top:20px; display:inline-flex; padding: 0 24px; width:auto;">&#128269; Start Analyzing &rarr;</a>
             </div>
             {% endif %}
 
@@ -93,6 +90,10 @@
                     <span aria-hidden="true">&larr;</span>
                     <span>Back to Analysis</span>
                 </button>
+                <a href="/dashboard" class="btn-secondary">
+                    <span aria-hidden="true">&#128200;</span>
+                    <span>Analytics Dashboard</span>
+                </a>
             </div>
         </section>
     </main>

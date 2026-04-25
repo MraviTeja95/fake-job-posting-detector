@@ -5,3 +5,5 @@ flask-login
 joblib
 requests
 beautifulsoup4
+openai
+python-dotenv

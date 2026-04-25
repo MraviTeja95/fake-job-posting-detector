@@ -4,24 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeRecruit AI - Fake Job Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=5">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20">
 </head>
 
 <body class="main-page">
     <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
-        <select id="themeSelector" class="theme-selector" aria-label="Select theme">
-            <option value="light">Classic Light</option>
-            <option value="dark">Midnight Dark</option>
-            <option value="cyberpunk">Cyberpunk</option>
-            <option value="ocean">Ocean Blue</option>
-            <option value="hacker">Hacker Terminal</option>
-            <option value="solarized">Solarized Warm</option>
-            <option value="nothing">Nothing Theme</option>
-            <option value="glass">Glass UI</option>
-            <option value="chatgpt">ChatGPT Style</option>
-        </select>
         {% if current_user.is_authenticated %}
         <button
             type="button"
@@ -47,11 +36,9 @@
     </div>
 
     <main class="container">
-        <section class="header-section" aria-labelledby="page-title">
-            <div class="brand-mark" aria-hidden="true">&#128737;</div>
+        <section class="header-section" aria-labelledby="chatgpt-center-title">
             <div class="header-copy">
-                <h1 id="page-title">SafeRecruit AI</h1>
-                <p id="chatgpt-center-title" style="display: none;">SafeRecruit AI</p>
+                <h1 id="chatgpt-center-title">SafeRecruit AI</h1>
             </div>
         </section>
 
@@ -101,38 +88,14 @@
                         </div>
                     </div>
                 </div>
-
-                <!-- Standalone upload block for all other themes -->
-                <div class="form-group upload-label-standalone">
-                    <label for="fileUpload" class="upload-label">
-                        <span class="upload-box">
-                            <svg class="upload-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
-                            <span class="upload-text">
-                                <p>Upload Screenshot</p>
-                                <small>Optional - JPG or PNG up to 16MB</small>
-                            </span>
-                        </span>
-                        <input type="file" id="fileUpload" name="job_image" accept="image/*" hidden>
-                    </label>
+                <!-- Live word count -->
+                <div id="wordCountBar" style="padding: 4px 2px 0; min-height: 20px;">
+                    <span id="wordCount" style="font-size:0.78rem; color:var(--muted); font-weight:600; letter-spacing:0.03em;"></span>
                 </div>
 
-                <!-- Outside chatgpt theme: normal submit btn -->
-                <button type="submit" id="analyzeBtnDefault" class="submit-btn chatgpt-hide-btn">
-                    <span id="btnText" class="btn-content">
-                        <svg class="btn-icon-svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
-                        <span>Analyze Job</span>
-                    </span>
-                    <span id="btnLoader" class="btn-loader" style="display: none;">
-                        <span class="btn-spinner" aria-hidden="true"></span>
-                        <span>Analyzing...</span>
-                    </span>
-                </button>
+
             </form>
 
-            <div id="loader" class="page-loader" style="display: none;" aria-live="polite">
-                <div class="spinner" aria-hidden="true"></div>
-                <p id="loaderText">Analyzing job description...</p>
-            </div>
         </section>
 
         {% else %}
@@ -177,6 +140,67 @@
                 <p class="category-badge">{{ category }}</p>
             </div>
 
+            {% if fraud_risk_score is defined and fraud_risk_score is not none %}
+            <div class="analysis-card llm-metrics-card">
+                <h3><span class="section-icon" aria-hidden="true">&#129302;</span>LLM Intelligence Metrics
+                    <span class="llm-badge">Powered by Llama-3.1-70B</span>
+                </h3>
+                <div class="metrics-grid">
+
+                    <div class="metric-item">
+                        <div class="metric-header">
+                            <span class="metric-label">&#128683; Fraud Risk Score</span>
+                            <span class="metric-value {% if fraud_risk_score > 60 %}metric-danger{% elif fraud_risk_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ fraud_risk_score }}/100</span>
+                        </div>
+                        <div class="metric-bar-track">
+                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ fraud_risk_score }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-item">
+                        <div class="metric-header">
+                            <span class="metric-label">&#128176; Financial Trap Index</span>
+                            <span class="metric-value {% if financial_trap_index > 60 %}metric-danger{% elif financial_trap_index > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ financial_trap_index }}/100</span>
+                        </div>
+                        <div class="metric-bar-track">
+                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ financial_trap_index }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-item">
+                        <div class="metric-header">
+                            <span class="metric-label">&#9989; Credibility Score</span>
+                            <span class="metric-value {% if credibility_score > 60 %}metric-safe{% elif credibility_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{ credibility_score }}/100</span>
+                        </div>
+                        <div class="metric-bar-track">
+                            <div class="metric-bar-fill metric-fill-safe" style="width: {{ credibility_score }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-item">
+                        <div class="metric-header">
+                            <span class="metric-label">&#9889; Urgency Pressure Score</span>
+                            <span class="metric-value {% if urgency_pressure_score > 60 %}metric-danger{% elif urgency_pressure_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ urgency_pressure_score }}/100</span>
+                        </div>
+                        <div class="metric-bar-track">
+                            <div class="metric-bar-fill metric-fill-warning" style="width: {{ urgency_pressure_score }}%"></div>
+                        </div>
+                    </div>
+
+                    <div class="metric-item">
+                        <div class="metric-header">
+                            <span class="metric-label">&#128203; Information Quality Score</span>
+                            <span class="metric-value {% if information_quality_score > 60 %}metric-safe{% elif information_quality_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{ information_quality_score }}/100</span>
+                        </div>
+                        <div class="metric-bar-track">
+                            <div class="metric-bar-fill metric-fill-safe" style="width: {{ information_quality_score }}%"></div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% endif %}
+
             {% if highlighted_text %}
             <div class="analysis-card">
                 <h3><span class="section-icon" aria-hidden="true">&#128196;</span>Job Description</h3>
@@ -192,6 +216,81 @@
                     <li class="finding-item">{{ r }}</li>
                     {% endfor %}
                 </ul>
+            </div>
+            {% endif %}
+
+            {% if validation_gates_passed is not none or consistency_check %}
+            <div class="analysis-card reliability-audit-card">
+                <h3><span class="section-icon" aria-hidden="true">&#10004;</span>Reliability Audit</h3>
+                
+                <div class="consistency-status">
+                    <span class="status-label">Consistency Check:</span>
+                    <span class="status-badge {{ consistency_check|default('pass')|upper }}">{{ consistency_check|default('pass')|upper }}</span>
+                </div>
+
+                <div class="validation-gate-status">
+                    <span class="status-label">Security Validation Gates:</span>
+                    <span class="status-badge {{ 'PASS' if validation_gates_passed else 'FAIL' }}">
+                        {{ 'ALL GATES PASSED' if validation_gates_passed else 'SECURITY GATES FAILED' }}
+                    </span>
+                </div>
+
+                {% if final_reasoning %}
+                <p class="final-reasoning-text">{{ final_reasoning }}</p>
+                {% endif %}
+
+                {% if failed_gates %}
+                <div class="failed-gates-section">
+                    <h4><span class="section-icon-small">&#10060;</span>Failed Forensic Gates</h4>
+                    <p class="gate-note">The following mandatory trust signals were NOT found:</p>
+                    <ul class="failed-gates-list">
+                        {% for gate in failed_gates %}
+                        <li>{{ gate }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="reasoning-grid">
+                    {% if evidence %}
+                    <div class="reasoning-column">
+                        <h4><span class="col-icon">📊</span> Forensic Evidence</h4>
+                        <ul class="reasoning-list evidence-list">
+                            {% for e in evidence %}
+                            <li>{{ e }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if company_analysis or contact_verification %}
+            <div class="analysis-card forensic-details-card">
+                <h3><span class="section-icon" aria-hidden="true">&#128737;</span>Signal Verification Checklist</h3>
+                
+                <div class="forensic-grid">
+                    {% if company_analysis %}
+                    <div class="forensic-sub-section">
+                        <h4>Company Presence</h4>
+                        <ul class="forensic-list">
+                            <li><span class="f-label">Exists Online:</span> <span class="f-value {{ company_analysis.exists_online|upper }}">{{ company_analysis.exists_online|upper }}</span></li>
+                            <li><span class="f-label">Platform Consistency:</span> <span class="f-value {{ company_analysis.platform_consistency|upper }}">{{ company_analysis.platform_consistency|upper }}</span></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if contact_verification %}
+                    <div class="forensic-sub-section">
+                        <h4>Contact Authenticity</h4>
+                        <ul class="forensic-list">
+                            <li><span class="f-label">Email Validity:</span> <span class="f-value {{ contact_verification.email_validity|upper }}">{{ contact_verification.email_validity|upper }}</span></li>
+                            <li><span class="f-label">Domain Check:</span> <span class="f-value {{ contact_verification.domain_check|upper }}">{{ contact_verification.domain_check|upper }}</span></li>
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
             {% endif %}
 
@@ -213,23 +312,78 @@
             </div>
             {% endif %}
 
+            <!-- AI Learning Feedback Card -->
+            <div class="analysis-card feedback-card" id="feedbackCard">
+                <h3><span class="section-icon" aria-hidden="true">&#129302;</span>Help SafeRecruit AI Learn</h3>
+                <p class="feedback-intro">Was this analysis accurate? Your feedback helps train our models for better detection.</p>
+                
+                <div class="feedback-actions" id="feedbackInitial">
+                    <button type="button" class="btn-feedback btn-yes" onclick="submitFeedback(event, 'YES')">
+                        <span class="fb-icon">👍</span> Yes, it's accurate
+                    </button>
+                    <button type="button" class="btn-feedback btn-no" onclick="showCorrectionForm()">
+                        <span class="fb-icon">👎</span> No, it's incorrect
+                    </button>
+                </div>
+
+                <div id="correctionForm" style="display: none; margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px;">
+                    <p style="font-size: 0.9rem; margin-bottom: 12px; font-weight: 600;">What is the correct verdict?</p>
+                    <div class="correction-options">
+                        <label class="fb-label"><input type="radio" name="correct_verdict" value="REAL"> ✅ REAL</label>
+                        <label class="fb-label"><input type="radio" name="correct_verdict" value="SUSPICIOUS"> ⚠️ SUSPICIOUS</label>
+                        <label class="fb-label"><input type="radio" name="correct_verdict" value="FAKE"> 🚨 FAKE</label>
+                    </div>
+                    <textarea id="feedbackNotes" class="textarea-input" placeholder="Optional: Why was the AI wrong? (e.g. 'It missed the Telegram link', 'This is a well-known brand')" rows="2" style="min-height: 80px; margin-top: 12px; font-size: 0.9rem;"></textarea>
+                    <button type="button" class="submit-btn" style="margin-top: 16px; width: 100%;" onclick="submitFeedback(event, 'NO')">
+                        <span class="btn-text">Submit and Train AI</span>
+                    </button>
+                </div>
+
+                <div id="feedbackSuccess" style="display: none; text-align: center; padding: 20px;">
+                    <div style="font-size: 2rem; margin-bottom: 10px;">🎓</div>
+                    <p style="font-weight: 700; color: var(--accent);">Learning Complete!</p>
+                    <p style="font-size: 0.85rem; color: var(--ink-soft);">SafeRecruit AI has updated its internal patterns based on your report.</p>
+                </div>
+            </div>
+
             <div class="action-buttons hide-on-print">
                 <button type="button" onclick="location.href='/'" class="btn-secondary">
                     <span aria-hidden="true">&larr;</span>
                     <span>New Analysis</span>
+                </button>
+                <button type="button" id="copyReportBtn" onclick="copyReport()" class="btn-secondary">
+                    <span aria-hidden="true">&#128203;</span>
+                    <span>Copy Report</span>
                 </button>
                 <button type="button" onclick="window.print()" class="btn-secondary">
                     <span aria-hidden="true">&#128424;</span>
                     <span>Save as PDF</span>
                 </button>
                 <a href="/history" class="btn-secondary">
-                    <span aria-hidden="true">&#128202;</span>
+                    <span aria-hidden="true">&#128203;</span>
                     <span>View History</span>
+                </a>
+                <a href="/dashboard" class="btn-secondary">
+                    <span aria-hidden="true">&#128200;</span>
+                    <span>Intelligence Dashboard</span>
                 </a>
             </div>
         </section>
         {% endif %}
     </main>
+
+    <!-- Modern Searching Loader — FULL SCREEN CENTERED -->
+    <!-- Modern ChatGPT-style Loader -->
+    <div id="loader" class="searching-overlay" style="display: none;" aria-live="polite">
+        <div class="loader-container">
+            <div class="chatgpt-loader">
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+            </div>
+            <p id="loaderText" class="status-messages">Analyzing forensics...</p>
+        </div>
+    </div>
 
     <!-- Chatbot Guide Widget -->
     <div class="guide-widget-container">
@@ -247,6 +401,14 @@
         </div>
     </div>
 
+    <!-- Safe Data Storage -->
+    <script id="jobData" type="application/json">
+        {
+            "original_text": {{ original_text|tojson|safe }},
+            "prediction": {{ prediction|tojson|safe }}
+        }
+    </script>
+
     <script src="{{ url_for('static', filename='script.js') }}?v=5"></script>
     <script>
         function toggleGuide() {
@@ -254,11 +416,6 @@
             popup.classList.toggle('active');
         }
 
-        // ChatGPT: show clean project name in center (no greeting)
-        (function() {
-            const el = document.getElementById('chatgpt-center-title');
-            if (el) el.style.display = 'block';
-        })();
 
         // === Image Thumbnail Preview (ChatGPT-style) ===
         (function() {
@@ -276,7 +433,7 @@
                     reader.onload = function(e) {
                         thumbEl.src = e.target.result;
                         if (nameEl) nameEl.textContent = file.name.length > 25 ? file.name.slice(0, 22) + '...' : file.name;
-                        previewArea.style.display = 'flex';
+                        previewArea.style.display = 'flex'; /* Show as flex inside the box */
                     };
                     reader.readAsDataURL(file);
                 }
@@ -335,22 +492,78 @@
         var form = document.getElementById('jobForm');
         if (form) {
             form.addEventListener('submit', function() {
-                var theme = document.documentElement.getAttribute('data-theme');
-                var inlineFile = document.getElementById('fileUploadInline');
-                var standaloneFile = document.getElementById('fileUpload');
+                var overlay = document.getElementById('loader');
+                if (overlay) overlay.style.display = 'flex';
+            });
+        }
 
-                if (theme === 'chatgpt') {
-                    // In ChatGPT theme, disable standalone input
-                    if (standaloneFile) standaloneFile.disabled = true;
-                } else {
-                    // In other themes, disable inline input
-                    if (inlineFile) inlineFile.disabled = true;
+        // === AI Feedback Submission ===
+        function showCorrectionForm() {
+            document.getElementById('feedbackInitial').style.display = 'none';
+            document.getElementById('correctionForm').style.display = 'block';
+        }
+
+        function submitFeedback(event, isAccurate) {
+            if (event) event.preventDefault();
+            
+            // Safe data retrieval
+            const jobData = JSON.parse(document.getElementById('jobData').textContent);
+            const originalText = jobData.original_text;
+            const prediction = jobData.prediction;
+            
+            let correction = prediction;
+            let notes = "";
+
+            if (isAccurate === 'NO') {
+                const selected = document.querySelector('input[name="correct_verdict"]:checked');
+                if (!selected) {
+                    alert("Please select the correct verdict.");
+                    return;
                 }
+                correction = selected.value;
+                notes = document.getElementById('feedbackNotes').value;
+            } else {
+                notes = "User confirmed accuracy.";
+            }
 
-                // Smooth fade out
-                document.body.style.opacity = '0';
-                document.body.style.transform = 'translateY(-8px)';
-                document.body.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
+            // Robust button identification
+            let submitBtn = event ? event.currentTarget : null;
+            if (!submitBtn && event) submitBtn = event.target.closest('button');
+            
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.classList.add('loading');
+                const origHtml = submitBtn.innerHTML;
+                submitBtn.innerHTML = '<span class="btn-spinner"></span> Submitting...';
+                submitBtn.dataset.originalHtml = origHtml;
+            }
+
+            const formData = new FormData();
+            formData.append('text', originalText);
+            formData.append('correction', correction);
+            formData.append('notes', notes);
+
+            fetch('/feedback', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('feedbackInitial').style.display = 'none';
+                document.getElementById('correctionForm').style.display = 'none';
+                document.getElementById('feedbackSuccess').style.display = 'block';
+                
+                const card = document.getElementById('feedbackCard');
+                if (card) card.classList.add('feedback-submitted');
+            })
+            .catch(error => {
+                console.error('Feedback Error:', error);
+                alert("Could not save feedback. Please try again later.");
+                if (submitBtn) {
+                    submitBtn.disabled = false;
+                    submitBtn.classList.remove('loading');
+                    submitBtn.innerHTML = submitBtn.dataset.originalHtml || 'Submit';
+                }
             });
         }
     </script>

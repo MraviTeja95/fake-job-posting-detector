@@ -16,24 +16,64 @@ function setButtonLoading(btn, text) {
     btn.disabled = true;
 }
 
+if (textarea) {
+    textarea.addEventListener("input", function () {
+        this.style.height = "auto";
+        this.style.height = this.scrollHeight + "px";
+        
+        // Toggle pulse class on button if text is present
+        if (button) {
+            if (this.value.trim().length > 0) {
+                button.classList.add("pulse");
+            } else {
+                button.classList.remove("pulse");
+            }
+        }
+    });
+}
+
 if (form) {
     form.addEventListener("submit", function () {
-        if (loader) loader.style.display = "block";
-        if (button) button.disabled = true;
-        if (btnText) btnText.style.display = "none";
-        if (btnLoader) btnLoader.style.display = "inline-flex";
+        if (loader) {
+            loader.style.display = "flex";
+            // Smoothly hide the input bar
+            const inputWrapper = document.querySelector(".chatgpt-input-wrapper");
+            if (inputWrapper) {
+                inputWrapper.style.opacity = "0.3";
+                inputWrapper.style.pointerEvents = "none";
+            }
+        }
+        if (button) {
+            button.disabled = true;
+            button.classList.remove("pulse");
+        }
 
         if (loaderText) {
-            const hasFile = fileInput && fileInput.files.length > 0;
-            const textValue = (textarea?.value || "").toLowerCase();
-
-            if (hasFile) {
-                loaderText.textContent = "Extracting text from screenshot...";
-            } else if (textValue.includes("linkedin.com")) {
-                loaderText.textContent = "Scanning LinkedIn profile...";
-            } else {
-                loaderText.textContent = "Analyzing job description...";
-            }
+            const messages = [
+                "🔍 Scanning for fraudulent patterns...",
+                "🛡️ Checking company credibility...",
+                "📉 Analyzing financial risk factors...",
+                "🤖 Evaluating LLM forensic signals...",
+                "📑 Cross-referencing job domains...",
+                "⚡ Finalizing safety report..."
+            ];
+            
+            let msgIndex = 0;
+            const cycleMessages = () => {
+                if (!loader || loader.style.display === "none") return;
+                loaderText.style.opacity = "0";
+                setTimeout(() => {
+                    loaderText.textContent = messages[msgIndex];
+                    loaderText.style.opacity = "1";
+                    msgIndex = (msgIndex + 1) % messages.length;
+                }, 300);
+            };
+            
+            cycleMessages();
+            const messageInterval = setInterval(cycleMessages, 2500);
+            
+            // Store interval to clear it if needed
+            window._loaderInterval = messageInterval;
         }
     });
 }
@@ -215,39 +255,18 @@ if (canvas && !reduceMotion) {
         requestAnimationFrame(animate);
     }
 
+    // Faster hover response
     document.addEventListener("mousemove", (event) => {
         mouseX = event.clientX;
         mouseY = event.clientY;
-    });
+    }, { passive: true });
 
-    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("resize", resizeCanvas, { passive: true });
     resizeCanvas();
     animate();
 }
 
-// Theme Selector Logic
 document.addEventListener("DOMContentLoaded", () => {
-    const themeSelector = document.getElementById("themeSelector");
-
-    if (!themeSelector) return;
-
-    // Check localStorage for theme
-    const currentTheme = localStorage.getItem("theme") || "light";
-    if (currentTheme !== "light") {
-        document.documentElement.setAttribute("data-theme", currentTheme);
-    }
-    themeSelector.value = currentTheme;
-
-    themeSelector.addEventListener("change", (e) => {
-        const theme = e.target.value;
-        if (theme === "light") {
-            document.documentElement.removeAttribute("data-theme");
-        } else {
-            document.documentElement.setAttribute("data-theme", theme);
-        }
-        localStorage.setItem("theme", theme);
-    });
-
     // History Filter Logic
     const historySearch = document.getElementById("historySearch");
     const historyFilter = document.getElementById("historyFilter");
@@ -276,4 +295,67 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (historySearch) historySearch.addEventListener("input", filterHistory);
     if (historyFilter) historyFilter.addEventListener("change", filterHistory);
+
+    // ===== LIVE WORD COUNT =====
+    const jobTextarea = document.getElementById("jobInput");
+    const wordCountEl = document.getElementById("wordCount");
+    if (jobTextarea && wordCountEl) {
+        function updateWordCount() {
+            const words = jobTextarea.value.trim().split(/\s+/).filter(Boolean);
+            const count = words.length;
+            let mode = "";
+            if (count === 0) {
+                wordCountEl.textContent = "";
+                return;
+            } else if (count < 50) {
+                mode = " · Brief mode";
+            } else if (count < 200) {
+                mode = " · Standard mode";
+            } else {
+                mode = " · Deep mode 🔍";
+            }
+            wordCountEl.textContent = `${count} word${count !== 1 ? "s" : ""}${mode}`;
+        }
+        jobTextarea.addEventListener("input", updateWordCount);
+    }
+
+    // ===== COPY REPORT =====
+    window.copyReport = function () {
+        const prediction   = document.querySelector(".result-card h2")?.textContent?.trim() || "";
+        const risk         = document.querySelector(".risk-text")?.textContent?.trim() || "";
+        const category     = document.querySelector(".category-badge")?.textContent?.trim() || "";
+        const findingItems = document.querySelectorAll(".finding-item");
+        const tipItems     = document.querySelectorAll(".tip-item");
+
+        let report = `SafeRecruit AI — Analysis Report\n`;
+        report += `================================\n`;
+        report += `Verdict    : ${prediction}\n`;
+        report += `Risk Score : ${risk}\n`;
+        report += `Category   : ${category}\n`;
+        if (findingItems.length) {
+            report += `\nKey Findings:\n`;
+            findingItems.forEach(li => { report += `  • ${li.textContent.trim()}\n`; });
+        }
+        if (tipItems.length) {
+            report += `\nSafety Tips:\n`;
+            tipItems.forEach(li => { report += `  • ${li.textContent.trim()}\n`; });
+        }
+        report += `\nAnalyzed by SafeRecruit AI — ${new Date().toLocaleString()}`;
+
+        navigator.clipboard.writeText(report).then(() => {
+            const btn = document.getElementById("copyReportBtn");
+            if (!btn) return;
+            const orig = btn.innerHTML;
+            btn.innerHTML = "✅ Copied!";
+            btn.style.background = "#10b981";
+            btn.style.color = "#fff";
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                btn.style.background = "";
+                btn.style.color = "";
+            }, 2000);
+        }).catch(() => {
+            alert("Could not copy to clipboard. Please copy manually.");
+        });
+    };
 });
