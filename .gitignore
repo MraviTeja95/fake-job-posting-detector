@@ -45,3 +45,6 @@ logs/
 # Distribution / packaging
 *.tar.gz
 *.zip
+
+# Local Backups
+SafeRecruit_Sensitive_Backup.zip
