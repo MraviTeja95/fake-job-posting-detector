@@ -206,6 +206,12 @@ def scrape_url_text(url):
         
     # Get text
     text = soup.get_text(separator=' ')
+    
+    # Check for Bot Protection / Security Challenges (Common on LinkedIn/Indeed)
+    block_phrases = ["security check", "captcha", "bot detection", "please sign in", "log in to view", "access denied", "verify you are human"]
+    if any(phrase in text.lower() for phrase in block_phrases):
+        raise ValueError("The website blocked our scanner (Security Check). Please paste the job description text manually for a more accurate analysis.")
+
     lines = (line.strip() for line in text.splitlines())
     chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
     return '\n'.join(chunk for chunk in chunks if chunk)
@@ -342,59 +348,35 @@ def _research_url_forensics(text: str) -> str:
 
 # ── LAYER 3: Strict LLM Prompt ────────────────────────────────────────────────
 _FEW_SHOT_EXAMPLES = """EXAMPLES:
-Input: "Job at Amazon! Link: amazon-recruitment.xyz" -> Output: {"verdict":"FAKE","confidence":99,"score":70,"validation_gates_passed":false,"failed_gates":["Company has verifiable presence","Email uses official domain"],"evidence":["Domain Spoofing detected"],"consistency_check":"pass"}
-Input: "Verified Microsoft role from microsoft.com" -> Output: {"verdict":"REAL","confidence":95,"score":0,"validation_gates_passed":true,"failed_gates":[],"evidence":["Official domain verified","2+ trust signals found"],"consistency_check":"pass"}"""
+Input: "Job at Amazon! Link: amazon-recruitment.xyz" -> Output: {"prediction":"Fake","confidence":"99%","company_legitimacy":"Low","link_trust_score":"Low","risk_level":"High","reasons":["Domain spoofing found","Generic email provider"],"final_advice":"Verify via amazon.jobs only."}
+Input: "Verified Microsoft role from microsoft.com" -> Output: {"prediction":"Real","confidence":"95%","company_legitimacy":"High","link_trust_score":"High","risk_level":"Low","reasons":["Official domain verified"],"final_advice":"Safe to apply."}"""
 
-_SYSTEM_PROMPT = f"""Role: Strict Fraud Detection Engine (Skeptical & Zero-Guessing).
-Goal: Force deterministic, evidence-gated classification. Eliminate hallucination.
+_SYSTEM_PROMPT = f"""Role: AI Fraud Verification System. 
+Goal: Determine if a job/company is REAL or FAKE using deep reasoning.
 
-VALIDATION GATES (MANDATORY for 'REAL'):
-1. Company has verifiable presence (LinkedIn/Official site).
-2. Email uses official corporate domain (NO generic providers like Gmail/Yahoo).
-3. Job description matches realistic, standard hiring patterns.
-4. ZERO scam signals detected (no upfront fees, no suspicious urgency).
-5. At least 2 independent trust signals found.
-
-VERDICT LOGIC (STRICT):
-- IF score >= 40 → FAKE
-- ELSE IF any Validation Gate fails → SUSPICIOUS
-- ELSE IF score < 10 AND all gates passed → REAL
-- ELSE → SUSPICIOUS
-
-SCORING (FAKE SIGNALS):
-- generic_email: +25
-- upfront_payment: +40
-- unrealistic_salary: +20
-- no_company_presence: +35
-- urgency_language: +10
-- poor_grammar: +10
+ANALYSIS PHASES:
+1. Company Legitimacy: Check for realistic name, known history, and vagueness.
+2. Link Verification: Analyze structure (Real domain vs Random/Short links). Check LinkedIn profile consistency.
+3. Job Content: Flag unrealistic salary, no experience high-pay, and urgency tactics.
+4. Communication: Flag WhatsApp/Telegram and personal emails (@gmail, @yahoo).
+5. Cross-Consistency: Match job description to company type and location.
 
 RULES:
-- DO NOT assumes. Only Measurable Facts.
-- Same input MUST produce same output.
-- Re-run scoring internally before final answer.
+- Do NOT hallucinate data.
+- If data is missing, say "Insufficient data".
+- Mark as "Suspicious" if unsure.
 
 {_FEW_SHOT_EXAMPLES}
 
 JSON SCHEMA:
 {{
-  "verdict": "fake" | "suspicious" | "real",
-  "confidence": 0-100,
-  "score": 0-100,
-  "validation_gates_passed": true | false,
-  "failed_gates": ["List of failed mandatory gates"],
-  "evidence": ["Measurable facts only"],
-  "consistency_check": "pass" | "fail",
-  "final_reasoning": "Strict logical derivation",
-  "company_analysis": {{
-    "exists_online": "yes" | "no" | "uncertain",
-    "platform_consistency": "consistent" | "inconsistent"
-  }},
-  "contact_verification": {{
-    "email_validity": "valid" | "suspicious",
-    "domain_check": "valid" | "suspicious"
-  }},
-  "suggestions": ["Safety protocols"]
+  "prediction": "Real | Fake | Suspicious",
+  "confidence": "0-100%",
+  "company_legitimacy": "High | Medium | Low",
+  "link_trust_score": "High | Medium | Low",
+  "risk_level": "Low | Medium | High",
+  "reasons": ["string"],
+  "final_advice": "string"
 }}"""
 
 _ADAPTIVE_DEPTH = {
@@ -439,11 +421,11 @@ def _validate_output(result: dict) -> bool:
     if "verdict" in result:
         result["verdict"] = result["verdict"].upper()
     
-    required_keys = {"verdict", "score", "validation_gates_passed", "failed_gates"}
+    required_keys = {"prediction", "confidence", "company_legitimacy", "link_trust_score", "risk_level"}
     if not required_keys.issubset(result.keys()):
         return False
     
-    if result.get("verdict") not in {"FAKE", "SUSPICIOUS", "REAL"}:
+    if result.get("prediction").upper() not in {"REAL", "FAKE", "SUSPICIOUS"}:
         return False
         
     return True
@@ -451,9 +433,15 @@ def _validate_output(result: dict) -> bool:
 
 def _fill_defaults(result: dict) -> dict:
     """Ensure all fields exist even if LLM returned a partial response."""
-    result.setdefault("verdict",                 "SUSPICIOUS")
-    result.setdefault("confidence",              50)
-    result.setdefault("score",                   50)
+    result.setdefault("prediction",                 "SUSPICIOUS")
+    result.setdefault("confidence",                 50)
+    result.setdefault("risk",                       50)
+    result.setdefault("fraud_risk_score",           50)
+    result.setdefault("financial_trap_index",       50)
+    result.setdefault("credibility_score",          50)
+    result.setdefault("urgency_pressure_score",     30)
+    result.setdefault("information_quality_score",  50)
+    result.setdefault("category",                   "General")
     result.setdefault("validation_gates_passed", False)
     result.setdefault("failed_gates",            ["Missing mandatory validation audit."])
     
@@ -492,21 +480,11 @@ def _fill_defaults(result: dict) -> dict:
         "✓ Check if this job exists on official LinkedIn pages.",
     ])
     
-    # Map back to flat structure for UI compatibility
-    result["prediction"] = result["verdict"]
-    result["risk"] = result["score"]
-    result["reasons"] = result["evidence"]
-    
     return result
 
 
-# ── LAYER 5: Token-Optimised LLM Call ────────────────────────────────────────
-def _call_llm(client, text: str, retries: int = 2) -> dict | None:
-    """
-    Calls NVIDIA Llama-3.1-70B with strict token limits.
-    max_tokens=700 — enough for full JSON with all metrics + reasons + suggestions.
-    Retries up to 2 times on transient failures.
-    """
+# ── LAYER 5: Token-Optimised LLM Call ──
+def _call_llm(client, text: str, retries: int = 1) -> dict | None:
     user_prompt = _build_user_prompt(text)
 
     for attempt in range(retries + 1):
@@ -525,9 +503,9 @@ def _call_llm(client, text: str, retries: int = 2) -> dict | None:
                     {"role": "system", "content": sys_prompt_with_feedback},
                     {"role": "user",   "content": prompt_to_send},
                 ],
-                temperature=0.0,   # Deterministic for forensic consistency
-                top_p=0.1,         # Strict nucleus sampling
-                max_tokens=800,    # Sufficient for structured JSON
+                temperature=0.0,
+                top_p=0.1,
+                max_tokens=300,
                 stream=True,
             )
             for chunk in completion:
@@ -548,13 +526,24 @@ def _call_llm(client, text: str, retries: int = 2) -> dict | None:
                 raw_json = json_match.group(1) if json_match.lastindex else json_match.group()
                 result = json.loads(raw_json)
                 
-                # Standardize keys for UI and logic
-                if "verdict" in result:
-                    result["prediction"] = result["verdict"]
-                if "risk_score" in result:
-                    result["risk"] = result["risk_score"]
-                if "confidence_score" in result:
-                    result["confidence"] = result["confidence_score"]
+                # Extract from your Custom Reasoning Structure
+                result["prediction"] = result.get("prediction", "Suspicious").upper()
+                conf_str = str(result.get("confidence", "50%")).replace("%", "")
+                result["confidence"] = int(conf_str) if conf_str.isdigit() else 50
+                
+                # Map Categories to UI Risk Scores
+                risk_map = {"High": 90, "Medium": 50, "Low": 15}
+                trust_map = {"High": 15, "Medium": 50, "Low": 90}
+                
+                result["risk"] = risk_map.get(result.get("risk_level"), 50)
+                result["fraud_risk_score"] = result["risk"]
+                result["financial_trap_index"] = trust_map.get(result.get("link_trust_score"), 50)
+                result["credibility_score"] = 100 - trust_map.get(result.get("company_legitimacy"), 50)
+                
+                # Standard UI Mapping
+                result["reasons"] = result.get("reasons", [])
+                result["suggestions"] = [result.get("final_advice", "Verifying...")]
+                result["final_reasoning"] = result.get("final_advice", "Deep reasoning applied.")
                 
                 # Flatten metrics if they are in the nested 'metrics' key
                 if "metrics" in result and isinstance(result["metrics"], dict):
@@ -577,19 +566,19 @@ def _call_llm(client, text: str, retries: int = 2) -> dict | None:
 
 
 # =============================================================================
-# PUBLIC ENTRY POINT — Full Guardrail Pipeline
+# PUBLIC ENTRY POINT - Full Guardrail Pipeline
 # =============================================================================
 def analyze_job_description(text: str) -> dict:
     """
     Full 5-layer analysis pipeline:
-      L1 → Input Validator    — rejects empty/gibberish/non-text inputs
-      L2 → Task Classifier    — rejects non-job-related text without API call
-      L3 → Strict LLM Prompt  — model self-rejects unclear inputs
-      L4 → Output Validator   — discards malformed LLM responses
-      L5 → Token Optimiser    — max_tokens=512, text capped at 1500 chars
+      L1: Input Validator - rejects empty/gibberish/non-text inputs
+      L2: Task Classifier - rejects non-job-related text without API call
+      L3: Strict LLM Prompt - model self-rejects unclear inputs
+      L4: Output Validator - discards malformed LLM responses
+      L5: Token Optimiser - max_tokens=300, text capped at 1500 chars
     """
 
-    # ── L1: Validate input ────────────────────────────────────────────────────
+    # -- L1: Validate input ----------------------------------------------------
     is_valid, rejection_reason = _validate_input(text)
     if not is_valid:
         reason_map = {
@@ -659,7 +648,7 @@ def analyze_job_with_llm(text: str) -> dict:
 
 
 def _rule_based_analyze(text: str) -> dict:
-    """Keyword-weighted rule-based fallback — used when LLM is unavailable."""
+    """Keyword-weighted rule-based fallback - used when LLM is unavailable."""
     if not text or len(text.strip()) < 10:
         return {
             "prediction": "INVALID", "confidence": 0, "risk": 0,
@@ -858,9 +847,11 @@ def uploaded_file(filename):
 @app.route("/", methods=["GET", "POST"])
 @login_required
 def home():
+    result = {}  # Initialize result to prevent UndefinedError
     prediction = confidence = risk = category = reasons = suggestions = highlighted_text = error = None
     processed_image_url = None
     scraped_url = None
+    job_input = None  # Ensure job_input is initialized for the template
 
     if request.method == "POST":
         job_input = request.form.get("job_input", "").strip()
@@ -905,17 +896,18 @@ def home():
                     scraped_url = job_input
                     job_input = scrape_url_text(job_input)
                 except Exception as e:
-                    error = f"Error scraping URL: {str(e)}"
+                    error = str(e)
+                    job_input = None # Stop analysis if scraping failed (e.g. LinkedIn Security Check)
 
         if job_input:
-            # Check cache first to avoid redundant LLM API calls
-            cached = _get_cached(job_input)
+            # Bypass cache for URLs to ensure deep, fresh analysis every time
+            cached = _get_cached(job_input) if not scraped_url else None
             if cached:
                 result = cached
             else:
                 result = analyze_job_description(job_input)
-                # Only cache valid analyses — never cache INVALID responses
-                if result.get("prediction") != "INVALID":
+                # Only cache valid analyses — never cache INVALID or URL-based responses
+                if result.get("prediction") != "INVALID" and not scraped_url:
                     _set_cache(job_input, result)
 
             prediction  = result["prediction"]
@@ -972,18 +964,19 @@ def home():
         category=category, reasons=reasons, suggestions=suggestions,
         highlighted_text=highlighted_text, processed_image_url=processed_image_url, error=error,
         scraped_url=scraped_url,
-        fraud_risk_score=locals().get('fraud_risk_score'),
-        financial_trap_index=locals().get('financial_trap_index'),
+        fraud_risk_score=result.get('fraud_risk_score', 50),
+        financial_trap_index=result.get('financial_trap_index', 50),
+        credibility_score=result.get('credibility_score', 50),
+        urgency_pressure_score=result.get('urgency_pressure_score', 30),
+        information_quality_score=result.get('information_quality_score', 50),
         # Strict Security and Consistency fields
-        validation_gates_passed=locals().get('result', {}).get('validation_gates_passed'),
-        failed_gates=locals().get('result', {}).get('failed_gates'),
-        consistency_check=locals().get('result', {}).get('consistency_check'),
-        evidence=locals().get('result', {}).get('evidence'),
-        final_reasoning=locals().get('result', {}).get('final_reasoning'),
-        company_analysis=locals().get('result', {}).get('company_analysis'),
-        contact_verification=locals().get('result', {}).get('contact_verification'),
+        consistency_check=result.get('consistency_check', 'pass'),
+        evidence=result.get('evidence', []),
+        final_reasoning=result.get('final_reasoning', 'Analysis complete.'),
+        company_analysis=result.get('company_analysis'),
+        contact_verification=result.get('contact_verification'),
         # Pass original text
-        original_text=request.form.get("job_input", "") if request.method == "POST" else ""
+        original_text=job_input if request.method == "POST" else ""
     )
 
 @app.route("/login", methods=["GET", "POST"])

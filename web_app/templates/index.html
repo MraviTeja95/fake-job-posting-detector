@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,14 +13,8 @@
 
     <div class="profile-wrapper">
         {% if current_user.is_authenticated %}
-        <button
-            type="button"
-            class="profile-box"
-            onclick="toggleMenu(this)"
-            aria-haspopup="true"
-            aria-expanded="false"
-            aria-controls="profileMenu"
-        >
+        <button type="button" class="profile-box" onclick="toggleMenu(this)" aria-haspopup="true" aria-expanded="false"
+            aria-controls="profileMenu">
             <span class="avatar">{{ current_user.username[0]|upper }}</span>
             <span class="profile-info">
                 <span class="username">{{ current_user.username }}</span>
@@ -57,7 +52,8 @@
                         <div id="imgPreviewArea" class="img-preview-area">
                             <div class="img-thumb-wrapper">
                                 <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="Uploaded image preview">
-                                <button type="button" id="imgRemoveBtn" class="img-thumb-remove" title="Remove image">&times;</button>
+                                <button type="button" id="imgRemoveBtn" class="img-thumb-remove"
+                                    title="Remove image">&times;</button>
                             </div>
                             <span id="imgFileName" class="img-file-name"></span>
                         </div>
@@ -65,24 +61,25 @@
                         <!-- Input row: textarea + actions -->
                         <div class="chatgpt-input-row">
                             <div class="chatgpt-content-area">
-                                <textarea
-                                    id="jobInput"
-                                    name="job_input"
-                                    class="textarea-input"
-                                    rows="1"
-                                    placeholder="Analyze a job posting for fraud signals..."
-                                    style="overflow:hidden;"
-                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"
-                                ></textarea>
+                                <textarea id="jobInput" name="job_input" class="textarea-input" rows="1"
+                                    placeholder="Analyze a job posting for fraud signals..." style="overflow:hidden;"
+                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
                             </div>
 
                             <div class="chatgpt-actions-right">
                                 <label for="fileUploadInline" class="upload-label-inline" title="Upload screenshot">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
+                                        </path>
+                                    </svg>
                                     <input type="file" id="fileUploadInline" name="job_image" accept="image/*" hidden>
                                 </label>
                                 <button type="submit" id="analyzeBtn" class="submit-btn chatgpt-send-btn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M2 21L23 12 2 3v7l15 2-15 2z" />
+                                    </svg>
                                 </button>
                             </div>
                         </div>
@@ -90,7 +87,8 @@
                 </div>
                 <!-- Live word count -->
                 <div id="wordCountBar" style="padding: 4px 2px 0; min-height: 20px;">
-                    <span id="wordCount" style="font-size:0.78rem; color:var(--muted); font-weight:600; letter-spacing:0.03em;"></span>
+                    <span id="wordCount"
+                        style="font-size:0.78rem; color:var(--muted); font-weight:600; letter-spacing:0.03em;"></span>
                 </div>
 
 
@@ -107,9 +105,19 @@
                         {% elif prediction == "REAL" %}&#10003;
                         {% else %}?{% endif %}
                     </span>
-                    <div>
-                        <p class="result-label">Prediction</p>
-                        <h2>{{ prediction }}</h2>
+                    <div class="result-header">
+                        <div class="header-left">
+                            <h2 class="result-title">Intelligence Report</h2>
+                            <p class="result-subtitle">ID: #{{ range(1000, 9999)|random }}-SR</p>
+                        </div>
+                        <div class="header-actions">
+                            <button class="btn-export" onclick="downloadReport()" title="Download as Text">
+                                <span class="icon">💾</span> Export Report
+                            </button>
+                            <div class="verdict-badge {{ prediction|lower }}">
+                                {{ prediction }}
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="result-stats" aria-label="Prediction statistics">
@@ -150,27 +158,35 @@
                     <div class="metric-item">
                         <div class="metric-header">
                             <span class="metric-label">&#128683; Fraud Risk Score</span>
-                            <span class="metric-value {% if fraud_risk_score > 60 %}metric-danger{% elif fraud_risk_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ fraud_risk_score }}/100</span>
+                            <span
+                                class="metric-value {% if fraud_risk_score > 60 %}metric-danger{% elif fraud_risk_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{
+                                fraud_risk_score }}/100</span>
                         </div>
                         <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ fraud_risk_score }}%"></div>
+                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ fraud_risk_score }}%">
+                            </div>
                         </div>
                     </div>
 
                     <div class="metric-item">
                         <div class="metric-header">
                             <span class="metric-label">&#128176; Financial Trap Index</span>
-                            <span class="metric-value {% if financial_trap_index > 60 %}metric-danger{% elif financial_trap_index > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ financial_trap_index }}/100</span>
+                            <span
+                                class="metric-value {% if financial_trap_index > 60 %}metric-danger{% elif financial_trap_index > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{
+                                financial_trap_index }}/100</span>
                         </div>
                         <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ financial_trap_index }}%"></div>
+                            <div class="metric-bar-fill metric-fill-danger" style="width: {{ financial_trap_index }}%">
+                            </div>
                         </div>
                     </div>
 
                     <div class="metric-item">
                         <div class="metric-header">
                             <span class="metric-label">&#9989; Credibility Score</span>
-                            <span class="metric-value {% if credibility_score > 60 %}metric-safe{% elif credibility_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{ credibility_score }}/100</span>
+                            <span
+                                class="metric-value {% if credibility_score > 60 %}metric-safe{% elif credibility_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{
+                                credibility_score }}/100</span>
                         </div>
                         <div class="metric-bar-track">
                             <div class="metric-bar-fill metric-fill-safe" style="width: {{ credibility_score }}%"></div>
@@ -180,20 +196,26 @@
                     <div class="metric-item">
                         <div class="metric-header">
                             <span class="metric-label">&#9889; Urgency Pressure Score</span>
-                            <span class="metric-value {% if urgency_pressure_score > 60 %}metric-danger{% elif urgency_pressure_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{ urgency_pressure_score }}/100</span>
+                            <span
+                                class="metric-value {% if urgency_pressure_score > 60 %}metric-danger{% elif urgency_pressure_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{
+                                urgency_pressure_score }}/100</span>
                         </div>
                         <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-warning" style="width: {{ urgency_pressure_score }}%"></div>
+                            <div class="metric-bar-fill metric-fill-warning"
+                                style="width: {{ urgency_pressure_score }}%"></div>
                         </div>
                     </div>
 
                     <div class="metric-item">
                         <div class="metric-header">
                             <span class="metric-label">&#128203; Information Quality Score</span>
-                            <span class="metric-value {% if information_quality_score > 60 %}metric-safe{% elif information_quality_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{ information_quality_score }}/100</span>
+                            <span
+                                class="metric-value {% if information_quality_score > 60 %}metric-safe{% elif information_quality_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{
+                                information_quality_score }}/100</span>
                         </div>
                         <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-safe" style="width: {{ information_quality_score }}%"></div>
+                            <div class="metric-bar-fill metric-fill-safe"
+                                style="width: {{ information_quality_score }}%"></div>
                         </div>
                     </div>
 
@@ -222,10 +244,11 @@
             {% if validation_gates_passed is not none or consistency_check %}
             <div class="analysis-card reliability-audit-card">
                 <h3><span class="section-icon" aria-hidden="true">&#10004;</span>Reliability Audit</h3>
-                
+
                 <div class="consistency-status">
                     <span class="status-label">Consistency Check:</span>
-                    <span class="status-badge {{ consistency_check|default('pass')|upper }}">{{ consistency_check|default('pass')|upper }}</span>
+                    <span class="status-badge {{ consistency_check|default('pass')|upper }}">{{
+                        consistency_check|default('pass')|upper }}</span>
                 </div>
 
                 <div class="validation-gate-status">
@@ -269,14 +292,18 @@
             {% if company_analysis or contact_verification %}
             <div class="analysis-card forensic-details-card">
                 <h3><span class="section-icon" aria-hidden="true">&#128737;</span>Signal Verification Checklist</h3>
-                
+
                 <div class="forensic-grid">
                     {% if company_analysis %}
                     <div class="forensic-sub-section">
                         <h4>Company Presence</h4>
                         <ul class="forensic-list">
-                            <li><span class="f-label">Exists Online:</span> <span class="f-value {{ company_analysis.exists_online|upper }}">{{ company_analysis.exists_online|upper }}</span></li>
-                            <li><span class="f-label">Platform Consistency:</span> <span class="f-value {{ company_analysis.platform_consistency|upper }}">{{ company_analysis.platform_consistency|upper }}</span></li>
+                            <li><span class="f-label">Exists Online:</span> <span
+                                    class="f-value {{ company_analysis.exists_online|upper }}">{{
+                                    company_analysis.exists_online|upper }}</span></li>
+                            <li><span class="f-label">Platform Consistency:</span> <span
+                                    class="f-value {{ company_analysis.platform_consistency|upper }}">{{
+                                    company_analysis.platform_consistency|upper }}</span></li>
                         </ul>
                     </div>
                     {% endif %}
@@ -285,8 +312,12 @@
                     <div class="forensic-sub-section">
                         <h4>Contact Authenticity</h4>
                         <ul class="forensic-list">
-                            <li><span class="f-label">Email Validity:</span> <span class="f-value {{ contact_verification.email_validity|upper }}">{{ contact_verification.email_validity|upper }}</span></li>
-                            <li><span class="f-label">Domain Check:</span> <span class="f-value {{ contact_verification.domain_check|upper }}">{{ contact_verification.domain_check|upper }}</span></li>
+                            <li><span class="f-label">Email Validity:</span> <span
+                                    class="f-value {{ contact_verification.email_validity|upper }}">{{
+                                    contact_verification.email_validity|upper }}</span></li>
+                            <li><span class="f-label">Domain Check:</span> <span
+                                    class="f-value {{ contact_verification.domain_check|upper }}">{{
+                                    contact_verification.domain_check|upper }}</span></li>
                         </ul>
                     </div>
                     {% endif %}
@@ -308,15 +339,17 @@
             {% if processed_image_url %}
             <div class="analysis-card">
                 <h3><span class="section-icon" aria-hidden="true">&#128444;</span>Screenshot Analysis</h3>
-                <img src="{{ processed_image_url }}" class="result-image" alt="Processed screenshot with highlighted risk signals">
+                <img src="{{ processed_image_url }}" class="result-image"
+                    alt="Processed screenshot with highlighted risk signals">
             </div>
             {% endif %}
 
             <!-- AI Learning Feedback Card -->
             <div class="analysis-card feedback-card" id="feedbackCard">
                 <h3><span class="section-icon" aria-hidden="true">&#129302;</span>Help SafeRecruit AI Learn</h3>
-                <p class="feedback-intro">Was this analysis accurate? Your feedback helps train our models for better detection.</p>
-                
+                <p class="feedback-intro">Was this analysis accurate? Your feedback helps train our models for better
+                    detection.</p>
+
                 <div class="feedback-actions" id="feedbackInitial">
                     <button type="button" class="btn-feedback btn-yes" onclick="submitFeedback(event, 'YES')">
                         <span class="fb-icon">👍</span> Yes, it's accurate
@@ -326,15 +359,21 @@
                     </button>
                 </div>
 
-                <div id="correctionForm" style="display: none; margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px;">
-                    <p style="font-size: 0.9rem; margin-bottom: 12px; font-weight: 600;">What is the correct verdict?</p>
+                <div id="correctionForm"
+                    style="display: none; margin-top: 20px; border-top: 1px solid var(--line); padding-top: 20px;">
+                    <p style="font-size: 0.9rem; margin-bottom: 12px; font-weight: 600;">What is the correct verdict?
+                    </p>
                     <div class="correction-options">
                         <label class="fb-label"><input type="radio" name="correct_verdict" value="REAL"> ✅ REAL</label>
-                        <label class="fb-label"><input type="radio" name="correct_verdict" value="SUSPICIOUS"> ⚠️ SUSPICIOUS</label>
+                        <label class="fb-label"><input type="radio" name="correct_verdict" value="SUSPICIOUS"> ⚠️
+                            SUSPICIOUS</label>
                         <label class="fb-label"><input type="radio" name="correct_verdict" value="FAKE"> 🚨 FAKE</label>
                     </div>
-                    <textarea id="feedbackNotes" class="textarea-input" placeholder="Optional: Why was the AI wrong? (e.g. 'It missed the Telegram link', 'This is a well-known brand')" rows="2" style="min-height: 80px; margin-top: 12px; font-size: 0.9rem;"></textarea>
-                    <button type="button" class="submit-btn" style="margin-top: 16px; width: 100%;" onclick="submitFeedback(event, 'NO')">
+                    <textarea id="feedbackNotes" class="textarea-input"
+                        placeholder="Optional: Why was the AI wrong? (e.g. 'It missed the Telegram link', 'This is a well-known brand')"
+                        rows="2" style="min-height: 80px; margin-top: 12px; font-size: 0.9rem;"></textarea>
+                    <button type="button" class="submit-btn" style="margin-top: 16px; width: 100%;"
+                        onclick="submitFeedback(event, 'NO')">
                         <span class="btn-text">Submit and Train AI</span>
                     </button>
                 </div>
@@ -342,7 +381,8 @@
                 <div id="feedbackSuccess" style="display: none; text-align: center; padding: 20px;">
                     <div style="font-size: 2rem; margin-bottom: 10px;">🎓</div>
                     <p style="font-weight: 700; color: var(--accent);">Learning Complete!</p>
-                    <p style="font-size: 0.85rem; color: var(--ink-soft);">SafeRecruit AI has updated its internal patterns based on your report.</p>
+                    <p style="font-size: 0.85rem; color: var(--ink-soft);">SafeRecruit AI has updated its internal
+                        patterns based on your report.</p>
                 </div>
             </div>
 
@@ -395,7 +435,8 @@
             </div>
             <div class="guide-body">
                 <p><strong>1. Paste Text or Link:</strong> Drop the job description or a URL into the main text box.</p>
-                <p><strong>2. Upload Screenshot:</strong> If you have an image, use the upload feature to extract text from it.</p>
+                <p><strong>2. Upload Screenshot:</strong> If you have an image, use the upload feature to extract text
+                    from it.</p>
                 <p><strong>3. Analyze:</strong> Click 'Analyze Job' to check for modern scam indicators.</p>
             </div>
         </div>
@@ -418,7 +459,7 @@
 
 
         // === Image Thumbnail Preview (ChatGPT-style) ===
-        (function() {
+        (function () {
             var previewArea = document.getElementById('imgPreviewArea');
             var thumbEl = document.getElementById('imgPreviewThumb');
             var nameEl = document.getElementById('imgFileName');
@@ -430,7 +471,7 @@
                 if (!file || !previewArea || !thumbEl) return;
                 if (file.type.startsWith('image/')) {
                     var reader = new FileReader();
-                    reader.onload = function(e) {
+                    reader.onload = function (e) {
                         thumbEl.src = e.target.result;
                         if (nameEl) nameEl.textContent = file.name.length > 25 ? file.name.slice(0, 22) + '...' : file.name;
                         previewArea.style.display = 'flex'; /* Show as flex inside the box */
@@ -449,26 +490,26 @@
 
             // Attach change listeners
             if (inlineInput) {
-                inlineInput.addEventListener('change', function() {
+                inlineInput.addEventListener('change', function () {
                     if (this.files && this.files[0]) showPreview(this.files[0]);
                 });
             }
             if (standaloneInput) {
-                standaloneInput.addEventListener('change', function() {
+                standaloneInput.addEventListener('change', function () {
                     if (this.files && this.files[0]) showPreview(this.files[0]);
                 });
             }
 
             // Remove button
             if (removeBtn) {
-                removeBtn.addEventListener('click', function(e) {
+                removeBtn.addEventListener('click', function (e) {
                     e.preventDefault();
                     hidePreview();
                 });
             }
 
             // Support pasting images (Ctrl+V / Cmd+V)
-            document.addEventListener('paste', function(e) {
+            document.addEventListener('paste', function (e) {
                 var items = (e.clipboardData || e.originalEvent.clipboardData).items;
                 for (var i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf('image/') === 0) {
@@ -491,7 +532,7 @@
         // Fix: On form submit, disable the unused file input so duplicate name="job_image" doesn't cause issues
         var form = document.getElementById('jobForm');
         if (form) {
-            form.addEventListener('submit', function() {
+            form.addEventListener('submit', function () {
                 var overlay = document.getElementById('loader');
                 if (overlay) overlay.style.display = 'flex';
             });
@@ -503,14 +544,65 @@
             document.getElementById('correctionForm').style.display = 'block';
         }
 
+        function downloadReport() {
+            const jobDataEl = document.getElementById('jobData');
+            if (!jobDataEl) return;
+            
+            const jobData = JSON.parse(jobDataEl.textContent);
+            const prediction = jobData.prediction || "UNKNOWN";
+            const text = jobData.original_text || "No text analyzed.";
+            
+            const reasons = Array.from(document.querySelectorAll('.reason-text')).map(el => "- " + el.innerText).join('\n');
+            const advice = document.querySelector('.final-verdict-text')?.innerText || "No advice provided.";
+            
+            const report = `
+SAFERECRUIT AI - FORENSIC JOB REPORT
+====================================
+Verdict: ${prediction.toUpperCase()}
+Timestamp: ${new Date().toLocaleString()}
+
+ANALYZED CONTENT:
+----------------
+${text}
+
+KEY FINDINGS:
+------------
+${reasons}
+
+FINAL ADVICE:
+------------
+${advice}
+
+------------------------------------
+Verified by SafeRecruit AI Forensic Engine
+            `.trim();
+
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `SafeRecruit_Report_${new Date().getTime()}.txt`;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+
         function submitFeedback(event, isAccurate) {
             if (event) event.preventDefault();
-            
-            // Safe data retrieval
-            const jobData = JSON.parse(document.getElementById('jobData').textContent);
-            const originalText = jobData.original_text;
-            const prediction = jobData.prediction;
-            
+
+            let originalText = "";
+            let prediction = "";
+
+            try {
+                const jobDataEl = document.getElementById('jobData');
+                if (jobDataEl) {
+                    const jobData = JSON.parse(jobDataEl.textContent);
+                    originalText = jobData.original_text || "";
+                    prediction = jobData.prediction || "";
+                }
+            } catch (e) {
+                console.error("Error parsing job data:", e);
+            }
+
             let correction = prediction;
             let notes = "";
 
@@ -529,7 +621,7 @@
             // Robust button identification
             let submitBtn = event ? event.currentTarget : null;
             if (!submitBtn && event) submitBtn = event.target.closest('button');
-            
+
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.classList.add('loading');
@@ -547,25 +639,26 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.json())
-            .then(data => {
-                document.getElementById('feedbackInitial').style.display = 'none';
-                document.getElementById('correctionForm').style.display = 'none';
-                document.getElementById('feedbackSuccess').style.display = 'block';
-                
-                const card = document.getElementById('feedbackCard');
-                if (card) card.classList.add('feedback-submitted');
-            })
-            .catch(error => {
-                console.error('Feedback Error:', error);
-                alert("Could not save feedback. Please try again later.");
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.classList.remove('loading');
-                    submitBtn.innerHTML = submitBtn.dataset.originalHtml || 'Submit';
-                }
-            });
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('feedbackInitial').style.display = 'none';
+                    document.getElementById('correctionForm').style.display = 'none';
+                    document.getElementById('feedbackSuccess').style.display = 'block';
+
+                    const card = document.getElementById('feedbackCard');
+                    if (card) card.classList.add('feedback-submitted');
+                })
+                .catch(error => {
+                    console.error('Feedback Error:', error);
+                    alert("Could not save feedback. Please try again later.");
+                    if (submitBtn) {
+                        submitBtn.disabled = false;
+                        submitBtn.classList.remove('loading');
+                        submitBtn.innerHTML = submitBtn.dataset.originalHtml || 'Submit';
+                    }
+                });
         }
     </script>
 </body>
+
 </html>
