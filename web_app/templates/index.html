@@ -63,7 +63,7 @@
                             <div class="chatgpt-content-area">
                                 <textarea id="jobInput" name="job_input" class="textarea-input" rows="1"
                                     placeholder="Analyze a job posting for fraud signals..." style="overflow:hidden;"
-                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'"></textarea>
+                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ original_text }}</textarea>
                             </div>
 
                             <div class="chatgpt-actions-right">
@@ -85,6 +85,41 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Resume Analysis Toggle / Section -->
+                <div class="resume-analysis-container">
+                    <button type="button" class="toggle-resume-btn" onclick="toggleResumeSection()">
+                        <span id="resumeToggleIcon">+</span> Add Resume for Semantic Matching (Optional)
+                    </button>
+                    
+                    <div id="resumeSection" class="resume-section-hidden">
+                        <div class="form-group">
+                            <label for="resumeInput" class="field-label">Paste Resume Content</label>
+                            <textarea id="resumeInput" name="resume_input" class="textarea-input" rows="5" placeholder="Paste your full resume here...">{{ resume_input }}</textarea>
+                        </div>
+                        
+                        <div class="metadata-grid">
+                            <div class="form-group">
+                                <label for="industry" class="field-label">Industry</label>
+                                <input type="text" id="industry" name="industry" class="text-input" placeholder="e.g. Fintech, Healthcare">
+                            </div>
+                            <div class="form-group">
+                                <label for="level" class="field-label">Experience Level</label>
+                                <select id="level" name="level" class="select-input">
+                                    <option value="">Select Level</option>
+                                    <option value="Junior">Junior / Entry Level</option>
+                                    <option value="Mid">Mid-Level</option>
+                                    <option value="Senior">Senior / Executive</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="location" class="field-label">Preferred Location</label>
+                                <input type="text" id="location" name="location" class="text-input" placeholder="e.g. Remote, New York">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Live word count -->
                 <div id="wordCountBar" style="padding: 4px 2px 0; min-height: 20px;">
                     <span id="wordCount"
@@ -146,12 +181,21 @@
                 </div>
                 <p class="risk-text">{{ risk }}% Scam Risk</p>
                 <p class="category-badge">{{ category }}</p>
+                
+                {% if prediction == "FAKE" and resume_input %}
+                <div class="scam-data-warning">
+                    <span class="warning-icon">⚠️</span>
+                    <div class="warning-content">
+                        <strong>Security Alert:</strong> Matching suppressed. We strongly advise against sending your resume to this company. Fake jobs are often used to collect sensitive personal data for identity theft.
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             {% if fraud_risk_score is defined and fraud_risk_score is not none %}
             <div class="analysis-card llm-metrics-card">
-                <h3><span class="section-icon" aria-hidden="true">&#129302;</span>LLM Intelligence Metrics
-                    <span class="llm-badge">Powered by Llama-3.1-70B</span>
+                <h3><span class="section-icon" aria-hidden="true">&#129302;</span>Intelligence Dashboard
+                    <span class="llm-badge">Multi-Agent Consensus (8B + 70B)</span>
                 </h3>
                 <div class="metrics-grid">
 
@@ -195,31 +239,78 @@
 
                     <div class="metric-item">
                         <div class="metric-header">
-                            <span class="metric-label">&#9889; Urgency Pressure Score</span>
+                            <span class="metric-label">&#127919; Match Accuracy</span>
                             <span
-                                class="metric-value {% if urgency_pressure_score > 60 %}metric-danger{% elif urgency_pressure_score > 40 %}metric-warning{% else %}metric-safe{% endif %}">{{
-                                urgency_pressure_score }}/100</span>
+                                class="metric-value {% if match_score > 75 %}metric-safe{% elif match_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{
+                                match_score }}/100</span>
                         </div>
                         <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-warning"
-                                style="width: {{ urgency_pressure_score }}%"></div>
-                        </div>
-                    </div>
-
-                    <div class="metric-item">
-                        <div class="metric-header">
-                            <span class="metric-label">&#128203; Information Quality Score</span>
-                            <span
-                                class="metric-value {% if information_quality_score > 60 %}metric-safe{% elif information_quality_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{
-                                information_quality_score }}/100</span>
-                        </div>
-                        <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-safe"
-                                style="width: {{ information_quality_score }}%"></div>
+                            <div class="metric-bar-fill metric-fill-safe" style="width: {{ match_score }}%"></div>
                         </div>
                     </div>
 
                 </div>
+            </div>
+            {% endif %}
+
+            {% if scout_summary %}
+            <div class="analysis-card scout-report-card">
+                <h3><span class="section-icon" aria-hidden="true">&#128373;</span>Agent 1: Scout Scan (8B)</h3>
+                <p class="scout-text">"{{ scout_summary }}"</p>
+                <div class="scout-meta">
+                    <span class="scout-tag">Initial Risk: {{ initial_risk }}%</span>
+                    <span class="scout-tag">Initial Match: {{ initial_match }}%</span>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if match_score > 0 %}
+            <div class="analysis-card match-intelligence-card">
+                <h3><span class="section-icon" aria-hidden="true">&#127891;</span>Match Intelligence</h3>
+                <div class="match-meta">
+                    <span class="match-badge">Confidence: {{ match_confidence }}</span>
+                </div>
+                
+                <div class="match-grid">
+                    <div class="match-column">
+                        <h4><span class="col-icon">✅</span> Key Matches</h4>
+                        <ul class="match-list">
+                            {% for m in key_matches %}
+                            <li>{{ m }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    <div class="match-column">
+                        <h4><span class="col-icon">⚠️</span> Critical Gaps</h4>
+                        <ul class="gap-list">
+                            {% for g in key_gaps %}
+                            <li>{{ g }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+
+                {% if recommendations %}
+                <div class="recommendations-section">
+                    <h4><span class="col-icon">💡</span> Recommendations</h4>
+                    <ul class="rec-list">
+                        {% for r in recommendations %}
+                        <li>{{ r }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if optimized_resume %}
+            <div class="analysis-card optimized-resume-card">
+                <div class="card-header-flex">
+                    <h3><span class="section-icon" aria-hidden="true">&#10024;</span>Tailored Resume Improvement</h3>
+                    <button class="btn-copy-resume" onclick="copyToClipboard('optimizedResumeContent')">Copy Text</button>
+                </div>
+                <p class="resume-tip">This version highlights your relevant skills specifically for this role.</p>
+                <div id="optimizedResumeContent" class="resume-content-preview">{{ optimized_resume|safe }}</div>
             </div>
             {% endif %}
 
@@ -535,6 +626,27 @@
             form.addEventListener('submit', function () {
                 var overlay = document.getElementById('loader');
                 if (overlay) overlay.style.display = 'flex';
+            });
+        }
+
+        function toggleResumeSection() {
+            const section = document.getElementById('resumeSection');
+            const icon = document.getElementById('resumeToggleIcon');
+            if (section.classList.contains('resume-section-hidden')) {
+                section.classList.remove('resume-section-hidden');
+                section.classList.add('resume-section-visible');
+                icon.textContent = '-';
+            } else {
+                section.classList.add('resume-section-hidden');
+                section.classList.remove('resume-section-visible');
+                icon.textContent = '+';
+            }
+        }
+
+        function copyToClipboard(elementId) {
+            const text = document.getElementById(elementId).innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert("Copied to clipboard!");
             });
         }
 
