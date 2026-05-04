@@ -508,11 +508,20 @@ def check_linkedin_company(text):
 
 
 def extract_company(text):
-    """Attempt to extract a candidate company name from the text using a simple pattern."""
-    if not text: return None
-    # Look for 'at [Company Name]' pattern
-    match = re.search(r'at\s+([A-Za-z0-9 &]+)', text)
-    return match.group(1).strip() if match else None
+    """Attempt to extract a candidate company name from the text using robust patterns."""
+    if not text: return "unknown"
+    
+    patterns = [
+        r'(?:at|with|from)\s+([A-Z][a-zA-Z0-9& ]+)',
+        r'([A-Z][a-zA-Z0-9& ]+)\s+(?:is hiring|hiring|careers)'
+    ]
+
+    for p in patterns:
+        match = re.search(p, text)
+        if match:
+            return match.group(1).strip()
+
+    return "unknown"
 
 
 def google_search_company(company):
@@ -543,6 +552,52 @@ def google_search_company(company):
 def check_google_presence(company):
     """Bridge to the API-based Google search."""
     return google_search_company(company)
+
+
+def _extract_domain(text):
+    """Extract domain from URLs or Emails in the job text."""
+    # Try URL first
+    url_match = re.search(r'https?://(?:www\.)?([^/\s]+)', text)
+    if url_match:
+        return url_match.group(1).lower()
+    
+    # Try Email
+    email_match = re.search(r'[\w.+-]+@([\w.-]+\.[a-zA-Z]{2,})', text)
+    if email_match:
+        return email_match.group(1).lower()
+    
+    return None
+
+
+def check_domain_age(domain):
+    """Fetch WHOIS data and compute domain age in days."""
+    try:
+        # Use a timeout if possible, but python-whois doesn't have a direct timeout param in some versions
+        w = whois.whois(domain)
+        creation_date = w.creation_date
+        
+        if not creation_date:
+            return "unknown"
+        
+        # creation_date can be a list or a single datetime object
+        if isinstance(creation_date, list):
+            creation_date = creation_date[0]
+            
+        if not isinstance(creation_date, datetime):
+            return "unknown"
+            
+        age_days = (datetime.now() - creation_date).days
+        
+        if age_days < 180:
+            return "new"
+        elif age_days <= 365:
+            return "medium"
+        else:
+            return "old"
+            
+    except Exception as e:
+        print(f"[WHOIS Error] {domain}: {e}")
+        return "unknown"
 
 
 def check_social_presence(text):
@@ -803,6 +858,10 @@ def _build_user_prompt(text: str, resume_text: str = None, metadata: dict = None
         prompt += f"Context: Industry: {metadata.get('industry')}, Level: {metadata.get('level')}, Location: {metadata.get('location')}\n"
         if metadata.get("platform_risk_boost", 0) > 0:
             prompt += f"CRITICAL ALERT: Automated Pre-Scan detected Platform Metadata Risk: +{metadata.get('platform_risk_boost')} risk factor. Be extremely skeptical of company legitimacy.\n"
+        if metadata.get("google_status") == "not_found":
+            prompt += "CRITICAL: Company not found on Google. Treat as suspicious.\n"
+        if metadata.get("domain_age") == "new":
+            prompt += "CRITICAL: Domain is newly registered. Treat as high risk.\n"
 
     prompt += f"\nJob posting:\n{text[:1500]}"
     
@@ -1100,21 +1159,40 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
             "engine": "WHOIS-Guardrail"
         }
 
-    # 🚨 NO ONLINE PRESENCE (GOOGLE SEARCH FAILED)
-    if verification["google_presence"] == "not_found":
-        print(f"[Guardrail] Company not found on Google")
-        return {
-            "prediction": "SUSPICIOUS",
-            "confidence": 85,
-            "risk": 75,
-            "category": "⚠️ No Company Presence",
-            "fraud_risk_score": 75,
-            "financial_trap_index": 70,
-            "credibility_score": 20,
-            "reasons": ["⚠️ High-risk signal: This company name does not match any official documents or websites on Google."],
-            "suggestions": ["Verify the company identity manually before applying. It may be a shell or ghost company."],
-            "engine": "Google-Guardrail"
-        }
+    # === GOOGLE SEARCH INTEGRATION ===
+    if metadata is None: metadata = {}
+    google_status = verification.get("google_presence", "unknown")
+    
+    # Guardrail: If company name is too short, treat a 'found' result as unknown
+    # (prevents false positives for generic single-letter/short strings)
+    company_name = verification.get("company_name", "")
+    if google_status == "found" and company_name and len(str(company_name)) < 3:
+        google_status = "unknown"
+
+    metadata["google_status"] = google_status
+    print("Google Status:", google_status)
+
+    # === DOMAIN FORENSICS (Requirement 4 & 8) ===
+    domain = _extract_domain(text)
+    print("Domain:", domain)
+    domain_age = "unknown"
+    if domain:
+        domain_age = check_domain_age(domain)
+    
+    metadata["domain_age"] = domain_age
+    print("Domain Age:", domain_age)
+
+    reasons = []
+    suggestions = []
+
+    if google_status == "not_found":
+        # Requirement 3: Increase fraud_risk_score by +30 (max 100)
+        risk_boost_val = 30
+        reasons.append("Company not found on Google (low legitimacy)")
+        # Note: prediction downgrade and risk boost applied in common flow below
+    elif google_status == "found":
+        # Requirement 3: Increase credibility_score by +20 (max 100)
+        metadata["credibility_boost"] = 20
 
     # 🚨 NO SOCIAL SIGNAL
     if verification["social_presence"] == "none":
@@ -1147,6 +1225,10 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
     if "payment unverified" in text_lower: risk_boost += 30
     if "$0 spent" in text_lower: risk_boost += 25
     if "no reviews" in text_lower: risk_boost += 15
+    if google_status == "not_found": 
+        risk_boost += 30
+        if "company" in text_lower:
+            risk_boost += 10
     
     if metadata is None: metadata = {}
     metadata["platform_risk_boost"] = risk_boost
@@ -1245,8 +1327,75 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
     # Cache the result if short
     if len(text) < 500:
         _set_cache(text, result)
+
+    # ── Apply Google-based Enhancements to Final Result ──
+    final_result = llm_result if llm_result else result
+    
+    # Apply Reasons and Suggestions
+    if reasons:
+        final_result.setdefault("reasons", []).extend(reasons)
+    if suggestions:
+        final_result.setdefault("suggestions", []).extend(suggestions)
         
-    return result
+    # Apply Google-specific logic (Requirement 3)
+    if google_status == "not_found":
+        boost = 30
+        # stronger penalty if company explicitly mentioned
+        if "company" in text.lower():
+            boost += 10
+
+        final_result["fraud_risk_score"] = min(final_result.get("fraud_risk_score", 50) + boost, 100)
+        final_result["risk"] = final_result["fraud_risk_score"]
+        
+        # Downgrade REAL to SUSPICIOUS if company not found
+        if final_result.get("prediction") == "REAL" and verification.get("company_name"):
+            final_result["prediction"] = "SUSPICIOUS"
+            final_result["category"] = "⚠️ Medium Risk (Ghost Company)"
+            
+        # Ensure reason is added only once
+        reason_text = "⚠️ Company not found on Google (low legitimacy)"
+        if reason_text not in final_result.get("reasons", []):
+            final_result.setdefault("reasons", []).append(reason_text)
+            
+    elif google_status == "found":
+        final_result["credibility_score"] = min(final_result.get("credibility_score", 50) + 20, 100)
+        
+    elif google_status == "unknown":
+        print("[Google] Skipping scoring due to API failure or indeterminate search result.")
+
+    # === Apply WHOIS scoring (Requirement 5) ===
+    domain_age = metadata.get("domain_age", "unknown")
+    if domain_age == "new":
+        final_result["fraud_risk_score"] = min(final_result.get("fraud_risk_score", 50) + 25, 100)
+        final_result["risk"] = final_result["fraud_risk_score"]
+        final_result.setdefault("reasons", []).append("⚠️ New domain detected (possible scam)")
+        final_result["urgency_pressure_score"] = min(final_result.get("urgency_pressure_score", 30) + 10, 100)
+        
+    elif domain_age == "medium":
+        final_result["fraud_risk_score"] = min(final_result.get("fraud_risk_score", 50) + 10, 100)
+        final_result["risk"] = final_result["fraud_risk_score"]
+        
+    elif domain_age == "old":
+        final_result["credibility_score"] = min(final_result.get("credibility_score", 50) + 15, 100)
+
+    # === Stronger Multi-Signal Logic (Requirement 6) ===
+    if domain_age == "new" and google_status == "not_found":
+        final_result["prediction"] = "FAKE"
+        final_result["category"] = "🚨 High Risk (Verified Scam Pattern)"
+        final_result["fraud_risk_score"] = max(final_result.get("fraud_risk_score", 0), 92)
+        final_result["risk"] = final_result["fraud_risk_score"]
+        final_result.setdefault("reasons", []).append("🚨 Critical signal: New domain + no Google presence (high scam probability)")
+
+    if "reasons" in final_result and isinstance(final_result["reasons"], list):
+        seen = set()
+        deduped = []
+        for r in final_result["reasons"]:
+            if r not in seen:
+                seen.add(r)
+                deduped.append(r)
+        final_result["reasons"] = deduped
+
+    return final_result
 
 
 # ── Rule-based analyser (fallback only) ──────────────────────────────────────
@@ -1506,25 +1655,53 @@ def home():
             except Exception as e:
                 error = f"Error processing image: {str(e)}"
 
+        is_protected_url = False
         if job_input:
             if job_input.startswith("http://") or job_input.startswith("https://"):
-                try:
+                url_lower = job_input.lower()
+                protected_platforms = ["linkedin.com", "indeed.com", "glassdoor.com"]
+                if any(plat in url_lower for plat in protected_platforms):
+                    print("Protected Platform Detected:", job_input)
+                    is_protected_url = True
                     scraped_url = job_input
-                    job_input = scrape_url_text(job_input)
-                except Exception as e:
-                    error = str(e)
-                    job_input = None # Stop analysis if scraping failed (e.g. LinkedIn Security Check)
+                    job_input = "Protected Platform URL: " + job_input # Prevent None and show something
+                    result = {
+                        "prediction": "SUSPICIOUS",
+                        "confidence": 60,
+                        "risk": 30,
+                        "category": "⚠️ Limited Analysis (Protected Platform)",
+                        "fraud_risk_score": 30,
+                        "reasons": [
+                            "This platform blocks automated scraping",
+                            "Unable to extract full job content"
+                        ],
+                        "suggestions": [
+                            "Copy and paste the full job description for accurate analysis",
+                            "Avoid relying only on URL-based scans"
+                        ],
+                        "engine": "Platform-Guard"
+                    }
+                else:
+                    try:
+                        scraped_url = job_input
+                        job_input = scrape_url_text(job_input)
+                    except Exception as e:
+                        error = str(e)
+                        job_input = None # Stop analysis if scraping failed (e.g. LinkedIn Security Check)
 
         if job_input:
-            # Bypass cache for URLs or when resume is provided to ensure deep, fresh analysis every time
-            cached = _get_cached(job_input) if not scraped_url and not resume_input else None
-            if cached:
-                result = cached
+            if is_protected_url:
+                pass # result is already populated with the protected platform response
             else:
-                result = analyze_job_description(job_input, resume_input, metadata)
-                # Only cache valid analyses — never cache INVALID or URL/Resume-based responses
-                if result.get("prediction") != "INVALID" and not scraped_url and not resume_input:
-                    _set_cache(job_input, result)
+                # Bypass cache for URLs or when resume is provided to ensure deep, fresh analysis every time
+                cached = _get_cached(job_input) if not scraped_url and not resume_input else None
+                if cached:
+                    result = cached
+                else:
+                    result = analyze_job_description(job_input, resume_input, metadata)
+                    # Only cache valid analyses — never cache INVALID or URL/Resume-based responses
+                    if result.get("prediction") != "INVALID" and not scraped_url and not resume_input:
+                        _set_cache(job_input, result)
 
             prediction  = result.get("prediction")
             confidence  = result.get("confidence", 50)
@@ -1572,7 +1749,7 @@ def home():
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
                 })
                 save_history(current_user.username, history)
-        elif request.method == "POST":
+        elif request.method == "POST" and not error:
             error = "Please enter a job description or upload an image"
 
     return render_template("index.html",

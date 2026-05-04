@@ -73,6 +73,28 @@
                             <strong>{{ item.confidence }}%</strong>
                         </div>
                     </div>
+
+                    {% if item.reasons %}
+                    <div class="history-details">
+                        <strong><span class="detail-icon">&#128269;</span> Key Findings:</strong>
+                        <ul class="detail-list">
+                            {% for r in item.reasons %}
+                            <li>{{ r }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if item.suggestions %}
+                    <div class="history-details">
+                        <strong><span class="detail-icon">&#128161;</span> Safety Tips:</strong>
+                        <ul class="detail-list">
+                            {% for s in item.suggestions %}
+                            <li>{{ s }}</li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    {% endif %}
                 </article>
                 {% endfor %}
             </div>
