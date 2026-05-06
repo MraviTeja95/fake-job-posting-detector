@@ -56,15 +56,15 @@ def get_nvidia_client():
 
 # ===== MULTI-AGENT PIPELINE =====
 
-def _agent_fast_scan(client, text: str, resume_text: str = None, metadata: dict = None) -> dict:
+def _agent_fast_scan(client, text: str, metadata: dict = None) -> dict:
     """Agent 1 (Llama-3.1-8B): The 'Scout' performs initial forensic scanning."""
     try:
         dynamic_fs = get_feedback_few_shots()
         completion = client.chat.completions.create(
             model="meta/llama-3.1-8b-instruct",
             messages=[
-                {"role": "system", "content": f"Role: Forensic Scout. Identify immediate red flags and perform quick resume alignment. Respond ONLY with a JSON object containing: 'initial_risk' (0-100), 'initial_match' (0-100), 'red_flags' (list), and 'scout_summary' (string). {dynamic_fs}"},
-                {"role": "user", "content": f"Analyze this Job: {text[:1000]}\nResume: {resume_text[:1000] if resume_text else 'N/A'}\nMetadata: {metadata}"}
+                {"role": "system", "content": f"Role: Senior Cybersecurity Forensic Scout. Identify immediate fraud patterns, social engineering triggers, and infrastructure anomalies. Respond ONLY with a JSON object containing: 'initial_risk' (0-100), 'red_flags' (list of specific patterns), and 'scout_summary' (concise forensic overview). {dynamic_fs}"},
+                {"role": "user", "content": f"Analyze this Job: {text[:1000]}\nMetadata: {metadata}"}
             ],
             temperature=0.1,
             max_tokens=400,
@@ -73,16 +73,15 @@ def _agent_fast_scan(client, text: str, resume_text: str = None, metadata: dict 
         return json.loads(completion.choices[0].message.content)
     except Exception as e:
         print(f"[Agent Fast Scan Error] {e}")
-        return {"initial_risk": 50, "initial_match": 0, "red_flags": ["Scan failed - fallback applied."]}
+        return {"initial_risk": 50, "red_flags": ["Scan failed - fallback applied."]}
 
-def _agent_forensic_analysis(client, text: str, scout_report: dict, resume_text: str = None, metadata: dict = None) -> dict:
+def _agent_forensic_analysis(client, text: str, scout_report: dict, metadata: dict = None) -> dict:
     """Agent 2 (Llama-3.1-70B): Optimized version"""
 
     # 🔥 Reduce input size
     text = text[:800] if text else ""
-    resume_text = resume_text[:500] if resume_text else ""
 
-    user_prompt = _build_user_prompt(text, resume_text, metadata)
+    user_prompt = _build_user_prompt(text, metadata)
     
     user_prompt += """
 IMPORTANT RULES:
@@ -169,7 +168,6 @@ Do NOT contradict these signals (e.g., if Recruiter Risk is high, do not mark as
 # ===== LLM ANALYSIS CACHE =====
 # Caches results by MD5 hash of input text — avoids repeat API calls, saves credits
 _ANALYSIS_CACHE: dict = {}
-_RESUME_SUMMARIES: dict = {} # Cache for resume summaries
 _ANALYSIS_CACHE_MAX = 50
 
 def _cache_key(text: str) -> str:
@@ -512,14 +510,23 @@ def extract_company(text):
     if not text: return "unknown"
     
     patterns = [
-        r'(?:at|with|from)\s+([A-Z][a-zA-Z0-9& ]+)',
-        r'([A-Z][a-zA-Z0-9& ]+)\s+(?:is hiring|hiring|careers)'
+        r'(?:at|from)\s+([A-Z][a-zA-Z0-9& ]+)',
+        r'([A-Z][a-zA-Z0-9& ]+)\s+(?:is hiring)'
     ]
 
     for p in patterns:
         match = re.search(p, text)
         if match:
             return match.group(1).strip()
+
+    # fallback: email domain or URL domain
+    email_match = re.search(r'[\w.+-]+@([\w.-]+\.[a-zA-Z]{2,})', text)
+    if email_match:
+        return email_match.group(1).split('.')[0]
+        
+    url_match = re.search(r'https?://(?:www\.)?([^/\s]+)', text)
+    if url_match:
+        return url_match.group(1).split('.')[0]
 
     return "unknown"
 
@@ -624,21 +631,22 @@ def verify_company_full(text):
         "google_presence": "unknown",
         "linkedin_status": "missing",
         "social_presence": "none",
-        "company_name": None
+        "company_name": None,
+        "domain_age": "unknown"
     }
 
     # Extract domain
-    match = re.search(r'https?://([^/\s]+)', text)
-    if match:
-        domain = match.group(1)
+    domain = _extract_domain(text)
+    if domain:
         result["domain_status"] = check_domain(domain)
         result["whois_status"] = check_whois(domain)
+        result["domain_age"] = check_domain_age(domain)
 
     # Identify company name
     company = extract_company(text)
     result["company_name"] = company
 
-    if company:
+    if company and company != "unknown":
         result["google_presence"] = check_google_presence(company)
 
     result["linkedin_status"] = check_linkedin_company(text)
@@ -647,36 +655,32 @@ def verify_company_full(text):
     return result
 
 
-def calculate_trust_score(verification):
+def calculate_trust_score(verification, text):
     """Calculate a weighted trust score (0-100) based on forensic evidence."""
-    score = 50  # Base score for unknown entities
+    trust = 50
 
-    # Domain & WHOIS Infrastructure (Heaviest Weight)
-    if verification["whois_status"] == "valid":
-        score += 15
-    elif verification["whois_status"] == "invalid":
-        score -= 30
+    if verification.get("google_presence") == "found":
+        trust += 20
+    elif verification.get("google_presence") == "not_found":
+        trust -= 30
 
-    # Google Reality Check
-    if verification["google_presence"] == "found":
-        score += 15
-    elif verification["google_presence"] == "not_found":
-        score -= 20
+    domain_age = verification.get("domain_age", "unknown")
+    if domain_age == "old":
+        trust += 15
+    elif domain_age == "new":
+        trust -= 25
 
-    # LinkedIn Professional Signal
-    if verification["linkedin_status"] == "valid":
-        score += 10
-    else:
-        score -= 10
+    # platform trusted
+    if verification.get("linkedin_status") == "valid" or verification.get("social_presence") in ["strong", "weak"]:
+        trust += 10
+    
+    # scam keywords
+    text_lower = text.lower()
+    scam_keywords = ["payment", "deposit", "urgent", "whatsapp", "telegram"]
+    if any(k in text_lower for k in scam_keywords):
+        trust -= 30
 
-    # Social Media Footprint
-    if verification["social_presence"] == "strong":
-        score += 10
-    elif verification["social_presence"] == "none":
-        score -= 15
-
-    # Clamp result between 0 and 100
-    return max(0, min(100, score))
+    return max(0, min(100, trust))
 
 
 def analyze_recruiter_behavior(text):
@@ -706,30 +710,47 @@ def analyze_recruiter_behavior(text):
 
 def build_final_verdict(text, verification):
     """Combine trust scoring and behavioral analysis into a final verdict."""
-    trust_score = calculate_trust_score(verification)
-    recruiter_risk, signals = analyze_recruiter_behavior(text)
+    trust_score = calculate_trust_score(verification, text)
+    recruiter_risk, detected_patterns, signals = analyze_recruiter_behavior(text)
+    
+    # Adjust trust score based on behavioral risk
+    final_trust = max(0, trust_score - recruiter_risk)
+    
+    reasons = [f"Detected known scam pattern: {p}" for p in detected_patterns]
 
-    # Calculation: Trust (infrastructure) minus Behavior (red flags)
-    final_score = trust_score - recruiter_risk
-
-    if final_score >= 70:
-        prediction = "REAL"
-        category = "✅ High Trust (Verified Employer)"
-    elif final_score >= 40:
-        prediction = "SUSPICIOUS"
-        category = "⚠️ Medium Trust (Review Recommended)"
-    else:
+    if final_trust < 30:
         prediction = "FAKE"
-        category = "🚨 Low Trust (Verified Scam Pattern)"
+        category = "🚨 High Risk (Verified Scam Pattern)"
+    elif final_trust <= 60:
+        prediction = "SUSPICIOUS"
+        category = "⚠️ Medium Risk (Suspicious Behavior)"
+    else:
+        prediction = "REAL"
+        category = "✅ Low Risk (Verified Employer)"
+
+    # Generate a why_risky explanation based on signals
+    why_risky_parts = []
+    if recruiter_risk > 30:
+        why_risky_parts.append(f"Multiple behavioral red flags were detected (Score: {recruiter_risk}). This indicates a pattern common in automated or low-effort scam campaigns.")
+    if signals.get("off_platform"):
+        why_risky_parts.append("The use of off-platform communication (Telegram/WhatsApp) is a critical indicator of identity theft and recruitment fraud, as it bypasses platform security monitors.")
+    if signals.get("payment_request"):
+        why_risky_parts.append("Requests for upfront payments, fees, or cryptocurrency are definitive markers of financial fraud. Legitimate employers never require payment for job applications or equipment.")
+    if signals.get("urgency"):
+        why_risky_parts.append("Artificial urgency ('Limited slots', 'Immediate hiring') is a social engineering tactic designed to rush victims into making mistakes.")
+    
+    why_risky_text = " ".join(why_risky_parts) if why_risky_parts else "No immediate behavioral scam patterns were definitively detected, but platform trust remains a key factor."
 
     return {
         "prediction": prediction,
-        "trust_score": trust_score,
+        "trust_score": final_trust,
         "recruiter_risk": recruiter_risk,
-        "final_score": max(0, min(100, final_score)),
+        "final_score": final_trust,
         "signals": signals,
         "category": category,
-        "fraud_risk_score": 100 - max(0, min(100, final_score)) # Invert for risk metric
+        "fraud_risk_score": 100 - final_trust,
+        "behavioral_reasons": reasons,
+        "why_risky": why_risky_text
     }
 
 
@@ -752,97 +773,77 @@ def linkedin_like_verification(text):
 
 
 # ── LAYER 3: Strict LLM Prompt ────────────────────────────────────────────────
-_FEW_SHOT_EXAMPLES = """EXAMPLES:
-Input: "Job at Amazon! Link: amazon-recruitment.xyz" -> Output: {"prediction":"Fake","confidence":"99%","company_legitimacy":"Low","link_trust_score":"Low","risk_level":"High","reasons":["Domain spoofing found","Generic email provider"],"final_advice":"Verify via amazon.jobs only."}
-Input: "Verified Microsoft role from microsoft.com" -> Output: {"prediction":"Real","confidence":"95%","company_legitimacy":"High","link_trust_score":"High","risk_level":"Low","reasons":["Official domain verified"],"final_advice":"Safe to apply."}"""
+_FEW_SHOT_EXAMPLES = """--- FORENSIC EXAMPLES ---
+Example 1 (High Risk):
+Input: "Urgent hiring! No interview needed. Contact on Telegram @job_offer. Payment $50 for background check."
+Output: {
+  "prediction": "Fake",
+  "confidence": "100%",
+  "risk": 95,
+  "category": "🚨 High Risk (Task Scam & Fee Fraud)",
+  "reasons": ["Detected known scam pattern: Upfront payment request", "Detected known scam pattern: Off-platform contact (Telegram)", "Detected known scam pattern: Artificial urgency"],
+  "why_risky": "This posting exhibits multiple high-confidence indicators of a 'Task Scam'. The request for an upfront fee for a background check is a classic financial fraud tactic, as legitimate employers cover these costs. Use of Telegram bypasses corporate communication standards to avoid traceability.",
+  "final_advice": "DO NOT send money or share personal data. Block the contact immediately.",
+  "fraud_risk_score": 95, "financial_trap_index": 90, "credibility_score": 5, "urgency_pressure_score": 85, "information_quality_score": 10
+}
 
-_SYSTEM_PROMPT = """Role: Advanced AI Fraud Detection and Job Verification System.
-Goal: STRICTLY evaluate whether a job posting is REAL, SUSPICIOUS, or FAKE.
+Example 2 (Low Risk):
+Input: "Software Engineer at Google. Apply on google.jobs/careers. Requirements: CS degree, 3 years experience."
+Output: {
+  "prediction": "Real",
+  "confidence": "95%",
+  "risk": 10,
+  "category": "✅ Low Risk (Verified Corporate)",
+  "reasons": ["Official career portal detected", "Standard professional requirements", "No social engineering triggers found"],
+  "why_risky": "The posting links to an official, verified corporate domain and follows standard recruitment protocols without any pressure tactics or financial red flags.",
+  "final_advice": "Safe to proceed through the official link provided.",
+  "fraud_risk_score": 10, "financial_trap_index": 5, "credibility_score": 95, "urgency_pressure_score": 10, "information_quality_score": 90
+}
+"""
 
-You MUST prioritize platform trust signals over general content quality.
---------------------------------------------------
-CRITICAL PLATFORM RULES (HIGHEST PRIORITY):
+_SYSTEM_PROMPT = """Role: You are a Lead Fraud Detection Analyst specializing in job scams and recruitment fraud.
 
-1. If ANY of the following is present:
-   - "Payment unverified"
-   - "$0 spent"
-   - "No reviews"
-   - Missing company name or unclear employer identity
+Your task is to analyze job postings deeply, identify scam patterns, and provide clear, forensic reasoning.
 
-   THEN:
-   → You MUST NOT classify the job as LOW RISK
-   → Minimum classification = SUSPICIOUS
-
-2. If MULTIPLE signals exist (e.g. Payment unverified + $0 spent):
-   → Increase fraud risk significantly
-   → Likely classification = FAKE or HIGH RISK
-
---------------------------------------------------
-STRICT DECISION RULES:
-
-- NEVER mark as "REAL" if:
-  • Payment is unverified
-  • Client has $0 spent
-  • Company identity is missing
-
-- Even if job description looks professional:
-  → Platform trust signals OVERRIDE content quality
-
---------------------------------------------------
-ANALYSIS FACTORS:
-1. Platform credibility (VERY IMPORTANT)
-2. Company authenticity
-3. Payment verification
-4. Job realism
-5. Scam patterns (urgent hiring, no interview, easy money)
+INSTRUCTIONS:
+1.  **Analyze Content Deeply**: Look beyond the surface level. Check for linguistic anomalies, social engineering triggers, and infrastructure mismatches.
+2.  **Identify Scam Patterns**: Look for 'Task Scams', 'Fee Fraud', 'Identity Harvesting', 'Ghost Companies', 'Payment Mismatches', etc.
+3.  **Explain Reasoning Clearly**: Do not use generic statements. Explain *exactly why* a signal is suspicious.
+4.  **Avoid Hallucination**: Do not invent company details. If a company is unknown, state it is 'Not found in official records'.
+5.  **Highlight Suspicious Phrases**: Mention specific phrases from the text that triggered the flags.
 
 --------------------------------------------------
-FINAL RULE:
-When in doubt → choose HIGHER risk. Never underestimate risk when platform trust is low.
+STRICT PLATFORM RULES:
+- If 'Payment unverified' or '$0 spent' is detected -> Minimum verdict = SUSPICIOUS.
+- If off-platform chat (Telegram/WhatsApp) is found -> High Risk / FAKE.
 
 --------------------------------------------------
 OUTPUT FORMAT (STRICT JSON):
 {{
   "prediction": "Real | Fake | Suspicious",
   "confidence": "0-100%",
-  "risk_level": "Low | Medium | High",
-  "match_score": 0-100,
-  "match_confidence": "Low | Medium | High",
+  "risk": 0-100,
+  "category": "Specific Risk Category",
+  "reasons": ["Bullet points of key findings using format: 'Detected known scam pattern: <pattern>'"],
+  "why_risky": "Deep, forensic explanation of the underlying risks. Link specific phrases to known scam types.",
+  "final_advice": "Clear, actionable safety advice.",
   "fraud_risk_score": 0-100,
   "financial_trap_index": 0-100,
   "credibility_score": 0-100,
   "urgency_pressure_score": 0-100,
   "information_quality_score": 0-100,
-  "company_legitimacy": "High | Medium | Low",
-  "link_trust_score": "High | Medium | Low",
-  "reasons": ["string"],
-  "final_advice": "string",
   "consistency_check": "pass | fail",
-  "evidence": ["string"],
-  "validation_gates_passed": true,
-  "failed_gates": ["string"],
-  "company_analysis": {{
-    "exists_online": "yes | no | uncertain",
-    "platform_consistency": "high | medium | low | uncertain"
-  }},
-  "contact_verification": {{
-    "email_validity": "high | medium | low | uncertain",
-    "domain_check": "official | suspicious | unknown"
-  }},
-  "optimized_resume": "Improved resume content (Markdown) if job is REAL",
-  "key_matches": ["string"],
-  "key_gaps": ["string"],
-  "recommendations": ["string"]
+  "evidence": ["List of forensic signals detected"]
 }}"""
 
 _ADAPTIVE_DEPTH = {
-    "short":    "Check: verifiable credentials, generic text, off-platform chat (Telegram/WhatsApp).",
-    "standard": "Check: linguistic cues, pay vs effort, domain mismatches.",
-    "deep":     "Check: social triggers (fear/greed), data contradictions, 'Task Scam' patterns.",
+    "short":    "Rapid forensic triage: check for obvious red flags like off-platform chat and generic text.",
+    "standard": "Linguistic and infrastructure analysis: evaluate pay/effort ratio and domain credibility.",
+    "deep":     "Full behavioral forensic audit: analyze social engineering triggers, data contradictions, and 'Task Scam' markers.",
 }
 
 
-def _build_user_prompt(text: str, resume_text: str = None, metadata: dict = None) -> str:
+def _build_user_prompt(text: str, metadata: dict = None) -> str:
     words = len(text.split())
     mode  = "short" if words < 50 else ("standard" if words < 200 else "deep")
     depth = _ADAPTIVE_DEPTH[mode]
@@ -861,24 +862,9 @@ def _build_user_prompt(text: str, resume_text: str = None, metadata: dict = None
         if metadata.get("google_status") == "not_found":
             prompt += "CRITICAL: Company not found on Google. Treat as suspicious.\n"
         if metadata.get("domain_age") == "new":
-            prompt += "CRITICAL: Domain is newly registered. Treat as high risk.\n"
+            prompt += "CRITICAL: new domain -> high risk\n"
 
     prompt += f"\nJob posting:\n{text[:1500]}"
-    
-    if resume_text:
-        # Token Optimization: Summarize resume if it's very long
-        res_key = hashlib.md5(resume_text.encode()).hexdigest()
-        if res_key in _RESUME_SUMMARIES:
-            resume_text = _RESUME_SUMMARIES[res_key]
-        elif len(resume_text.split()) > 350:
-            client = get_nvidia_client()
-            if client:
-                print("[Optimizer] Summarizing long resume...")
-                summary = _summarize_text_with_llm(client, resume_text)
-                _RESUME_SUMMARIES[res_key] = summary
-                resume_text = summary
-        
-        prompt += f"\n\nCandidate Resume:\n{resume_text}"
     
     return prompt
 
@@ -925,6 +911,7 @@ def _fill_defaults(result: dict) -> dict:
     result.setdefault("credibility_score",          50)
     result.setdefault("urgency_pressure_score",     30)
     result.setdefault("information_quality_score",  50)
+    result.setdefault("why_risky",                  "Analysis complete. No critical behavioral anomalies definitively flagged, but exercise standard caution.")
     result.setdefault("category",                   "General")
     result.setdefault("validation_gates_passed", False)
     result.setdefault("failed_gates",            ["Missing mandatory validation audit."])
@@ -988,18 +975,19 @@ def _fill_defaults(result: dict) -> dict:
 
 
 # ── LAYER 5: Multi-Agent Collaborative Call ──
-def _call_llm(client, text: str, resume_text: str = None, metadata: dict = None, retries: int = 1) -> dict | None:
+def _call_llm(client, text: str, metadata: dict = None, retries: int = 1) -> dict | None:
     for attempt in range(retries + 1):
         try:
             # Rate Limit Protection
+            import time
             time.sleep(1)
             
             # Step 1: Agent 1 (8B) performs Scout Scan
-            scout_report = _agent_fast_scan(client, text, resume_text, metadata)
+            scout_report = _agent_fast_scan(client, text, metadata)
             
             # Step 2: Agent 2 (70B) performs Lead Analysis ONLY if risk is not already clear
             if scout_report.get("initial_risk", 50) < 70:
-                final_result = _agent_forensic_analysis(client, text, scout_report, resume_text, metadata)
+                final_result = _agent_forensic_analysis(client, text, scout_report, metadata)
             else:
                 # 🔥 Skip 70B (high risk already clear)
                 print("[Pipeline] Short-circuiting to 8B decision (High Risk detected).")
@@ -1045,7 +1033,7 @@ def _call_llm(client, text: str, resume_text: str = None, metadata: dict = None,
 # =============================================================================
 # PUBLIC ENTRY POINT - Full Guardrail Pipeline
 # =============================================================================
-def analyze_job_description(text: str, resume_text: str = None, metadata: dict = None) -> dict:
+def analyze_job_description(text: str, metadata: dict = None) -> dict:
     """
     Full 5-layer analysis pipeline:
       L1: Input Validator - rejects empty/gibberish/non-text inputs
@@ -1269,7 +1257,7 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
         if metadata is None: metadata = {}
         metadata["verification"] = verification
         
-        llm_result = _call_llm(client, text, resume_text, metadata)
+        llm_result = _call_llm(client, text, metadata)
         if llm_result:
             # ── Post-LLM Hard Guardrail ──
             # If LLM says REAL but text has massive red flags, downgrade to SUSPICIOUS
@@ -1350,12 +1338,9 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
         # Downgrade REAL to SUSPICIOUS if company not found
         if final_result.get("prediction") == "REAL" and verification.get("company_name"):
             final_result["prediction"] = "SUSPICIOUS"
-            final_result["category"] = "⚠️ Medium Risk (Ghost Company)"
+            final_result["category"] = "⚠️ Medium Risk (Unverified Company)"
             
-        # Ensure reason is added only once
-        reason_text = "⚠️ Company not found on Google (low legitimacy)"
-        if reason_text not in final_result.get("reasons", []):
-            final_result.setdefault("reasons", []).append(reason_text)
+        final_result.setdefault("reasons", []).append("Company could not be verified online despite normal job description")
             
     elif google_status == "found":
         final_result["credibility_score"] = min(final_result.get("credibility_score", 50) + 20, 100)
@@ -1386,22 +1371,32 @@ def analyze_job_description(text: str, resume_text: str = None, metadata: dict =
         final_result["risk"] = final_result["fraud_risk_score"]
         final_result.setdefault("reasons", []).append("🚨 Critical signal: New domain + no Google presence (high scam probability)")
 
-    if "reasons" in final_result and isinstance(final_result["reasons"], list):
+    final_result["trust_score"] = metadata.get("trust_score", 50)
+    final_result["domain_age"] = metadata.get("domain_age", "unknown")
+
+    if metadata.get("source") == "linkedin":
+        final_result.setdefault("reasons", []).append("Source verified: LinkedIn job platform")
+        # Only boost if no strong scam signals
+        if final_result.get("fraud_risk_score", 50) < 50:
+            final_result["credibility_score"] = min(final_result.get("credibility_score", 50) + 10, 100)
+        else:
+            # Reduce blind trust if risk already high
+            final_result["credibility_score"] = min(final_result.get("credibility_score", 50) + 3, 100)
+
+    def dedupe_list(items):
         seen = set()
-        deduped = []
-        for r in final_result["reasons"]:
-            if r not in seen:
-                seen.add(r)
-                deduped.append(r)
-        final_result["reasons"] = deduped
+        return [x for x in items if not (x in seen or seen.add(x))]
+
+    if "reasons" in final_result and isinstance(final_result["reasons"], list):
+        final_result["reasons"] = dedupe_list(final_result["reasons"])
 
     return final_result
 
 
 # ── Rule-based analyser (fallback only) ──────────────────────────────────────
-def analyze_job_with_llm(text: str, resume_text: str = None) -> dict:
+def analyze_job_with_llm(text: str) -> dict:
     """Alias kept for backward compatibility."""
-    return analyze_job_description(text, resume_text)
+    return analyze_job_description(text)
 
 
 def _rule_based_analyze(text: str) -> dict:
@@ -1418,68 +1413,37 @@ def _rule_based_analyze(text: str) -> dict:
             "engine": "Rule-based",
         }
 
-    text_lower = text.lower()
-    red_flags = {
-        "upfront payment": 0.40, "wire transfer": 0.45, "bitcoin": 0.45,
-        "western union": 0.45, "gift card": 0.40, "itunes card": 0.40,
-        "cash app": 0.40, "venmo": 0.40, "paypal": 0.35, "crypto": 0.40,
-        "security deposit": 0.45, "starter kit": 0.40, "equipment fee": 0.45,
-        "whatsapp": 0.45, "telegram": 0.45, "signal": 0.40,
-        "no experience": 0.30, "no qualifications": 0.30, "no cv needed": 0.40,
-        "no interview": 0.45, "immediate hire": 0.40, "immediate start": 0.40,
-        "urgent": 0.30, "limited time": 0.25, "act now": 0.25,
-        "data entry": 0.20, "seo writer": 0.15, "virtual assistant": 0.20,
-        "upwork": 0.10, "freelancer": 0.10, "fiverr": 0.10,
-    }
-    legitimate_indicators = {
-        "apply on indeed": -0.10, "apply on linkedin": -0.10,
-        "requirements": -0.05, "qualifications": -0.05,
-        "benefits": -0.08, "salary": -0.08, "company": -0.08,
-        "official website": -0.10,
-    }
-    reasons = []
-    risk_score = 0.3
-    for flag, weight in red_flags.items():
-        if flag in text_lower:
-            risk_score += weight
-            if weight > 0.20:
-                reasons.append(f"⚠️ Detected: '{flag}'")
-    for indicator, reduction in legitimate_indicators.items():
-        if indicator in text_lower:
-            risk_score += reduction
+    risk_boost, detected_patterns, signals = analyze_recruiter_behavior(text)
+    
+    # Calculate base risk from length and content
+    base_risk = 30
     if len(text.split()) < 50:
-        risk_score += 0.15
-        reasons.append("📏 Job description is unusually brief")
-    risk_score = max(0.0, min(1.0, risk_score))
-    risk_percentage = int(risk_score * 100)
-    if risk_percentage > 55:
+        base_risk += 15
+        
+    final_risk = min(100, base_risk + risk_boost)
+    reasons = [f"Detected known scam pattern: {p}" for p in detected_patterns]
+    
+    if final_risk > 65:
         prediction = "FAKE"
-        confidence = min(95, risk_percentage)
-        category   = "🚨 High Risk"
-    elif risk_percentage > 45:
+        category = "🚨 High Risk"
+    elif final_risk > 40:
         prediction = "SUSPICIOUS"
-        confidence = min(85, int(risk_percentage / 1.2))
-        category   = "⚠️ Medium Risk"
+        category = "⚠️ Medium Risk"
     else:
         prediction = "REAL"
-        confidence = min(95, 100 - risk_percentage)
-        category   = "✅ Low Risk"
-    if not reasons:
-        reasons = ["✅ Job description appears legitimate."] if prediction == "REAL" else ["⚠️ Multiple fraud indicators detected."]
+        category = "✅ Low Risk"
+
     return {
-        "prediction": prediction, "confidence": confidence,
-        "risk": risk_percentage, "category": category,
-        "fraud_risk_score": risk_percentage,
-        "financial_trap_index": min(100, risk_percentage + 5),
-        "credibility_score": max(0, 100 - risk_percentage),
-        "urgency_pressure_score": risk_percentage // 2,
-        "information_quality_score": max(0, 80 - risk_percentage),
-        "reasons": reasons[:4],
+        "prediction": prediction, 
+        "confidence": 85 if len(detected_patterns) >= 2 else 60,
+        "risk": final_risk, 
+        "category": category,
+        "fraud_risk_score": final_risk,
+        "reasons": reasons if reasons else ["✓ No obvious fraud patterns detected."],
         "suggestions": [
             "✓ Verify company information independently.",
             "✓ Check official company website and LinkedIn.",
             "✓ Be cautious of requests for upfront payments.",
-            "✓ Research the company on Glassdoor or Indeed reviews.",
         ],
         "engine": "Rule-based",
     }
@@ -1595,6 +1559,27 @@ def highlight_keywords_in_image(image_path, keywords, output_path):
     except Exception as e:
         return False
 
+def is_valid_job_text(text):
+    text_lower = text.lower()
+
+    # Reject blocked pages
+    blocked = ["captcha", "login", "sign in", "security check"]
+    if any(b in text_lower for b in blocked):
+        return False
+
+    # Must contain job-related words
+    keywords = [
+        "job", "role", "salary", "experience",
+        "requirements", "responsibilities", "apply"
+    ]
+
+    hits = sum(1 for k in keywords if k in text_lower)
+
+    return hits >= 2 and len(text) > 300
+
+
+
+
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploaded_file(filename):
@@ -1610,8 +1595,8 @@ def home():
     job_input = None  # Ensure job_input is initialized for the template
 
     if request.method == "POST":
+        print("FILES:", request.files)  # Debugging: Show all uploaded files
         job_input = request.form.get("job_input", "").strip()
-        resume_input = request.form.get("resume_input", "").strip()
         
         # Optional Metadata
         metadata = {
@@ -1662,10 +1647,8 @@ def home():
                 protected_platforms = ["linkedin.com", "indeed.com", "glassdoor.com"]
                 if any(plat in url_lower for plat in protected_platforms):
                     print("Protected Platform Detected:", job_input)
-                    is_protected_url = True
-                    scraped_url = job_input
-                    job_input = "Protected Platform URL: " + job_input # Prevent None and show something
-                    result = {
+                    
+                    fallback_result = {
                         "prediction": "SUSPICIOUS",
                         "confidence": 60,
                         "risk": 30,
@@ -1681,6 +1664,27 @@ def home():
                         ],
                         "engine": "Platform-Guard"
                     }
+
+                    if "linkedin.com" in url_lower:
+                        try:
+                            scraped_url = job_input
+                            text = scrape_url_text(job_input)
+                            if is_valid_job_text(text):
+                                print("[LinkedIn] Valid job content extracted")
+                                job_input = text
+                                metadata["source"] = "linkedin"
+                            else:
+                                raise Exception("Invalid LinkedIn content")
+                        except Exception as e:
+                            is_protected_url = True
+                            scraped_url = job_input
+                            job_input = "Protected Platform URL: " + job_input
+                            result = fallback_result
+                    else:
+                        is_protected_url = True
+                        scraped_url = job_input
+                        job_input = "Protected Platform URL: " + job_input
+                        result = fallback_result
                 else:
                     try:
                         scraped_url = job_input
@@ -1693,14 +1697,14 @@ def home():
             if is_protected_url:
                 pass # result is already populated with the protected platform response
             else:
-                # Bypass cache for URLs or when resume is provided to ensure deep, fresh analysis every time
-                cached = _get_cached(job_input) if not scraped_url and not resume_input else None
+                # Bypass cache for URLs to ensure deep, fresh analysis every time
+                cached = _get_cached(job_input) if not scraped_url else None
                 if cached:
                     result = cached
                 else:
-                    result = analyze_job_description(job_input, resume_input, metadata)
-                    # Only cache valid analyses — never cache INVALID or URL/Resume-based responses
-                    if result.get("prediction") != "INVALID" and not scraped_url and not resume_input:
+                    result = analyze_job_description(job_input, metadata)
+                    # Only cache valid analyses — never cache INVALID or URL-based responses
+                    if result.get("prediction") != "INVALID" and not scraped_url:
                         _set_cache(job_input, result)
 
             prediction  = result.get("prediction")
@@ -1766,22 +1770,15 @@ def home():
         consistency_check=result.get('consistency_check', 'pass'),
         evidence=result.get('evidence', []),
         final_reasoning=result.get('final_reasoning', 'Analysis complete.'),
+        why_risky=result.get('why_risky', ''),
         company_analysis=result.get('company_analysis'),
         contact_verification=result.get('contact_verification'),
-        # Resume Match fields
-        match_score=result.get('match_score', 0),
-        match_confidence=result.get('match_confidence', 'Low'),
-        key_matches=result.get('key_matches', []),
-        key_gaps=result.get('key_gaps', []),
-        optimized_resume=result.get('optimized_resume'),
-        recommendations=result.get('recommendations', []),
         # Original input text
         original_text=job_input if request.method == "POST" else "",
-        resume_input=resume_input if request.method == "POST" else "",
         # Multi-Agent Visibility
         scout_summary=result.get('scout_summary'),
         initial_risk=result.get('initial_risk'),
-        initial_match=result.get('initial_match')
+        final_advice=result.get('final_advice', '')
     )
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1915,6 +1912,34 @@ def dashboard():
     }
     
     return render_template("dashboard.html", stats=stats)
+
+
+# ===== CHROME EXTENSION API ENDPOINT =====
+@app.route("/api/analyze", methods=["POST"])
+def api_analyze():
+    """API endpoint for the Chrome extension to submit job text for analysis."""
+    from flask import jsonify
+
+    try:
+        data = request.get_json() or {}
+        text = data.get("text", "").strip()
+        
+        if not text:
+            return jsonify({"error": "No job text provided. Please try again."}), 400
+
+        metadata = {"source": "linkedin_extension"}
+
+        result = analyze_job_description(text, metadata=metadata)
+        
+        # Override engine for clarity
+        result["engine"] = "Extension + AI Pipeline"
+        
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"[API Error] {e}")
+        return jsonify({"error": "Analysis failed", "details": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(debug=True)

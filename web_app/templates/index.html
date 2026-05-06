@@ -2,13 +2,31 @@
 <html lang="en">
 
 <head>
-    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeRecruit AI - Fake Job Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=20">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=100">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Space+Grotesk:wght@700;800&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        .profile-wrapper {
+            position: absolute !important;
+            top: 24px !important;
+            right: 24px !important;
+            z-index: 100000 !important;
+            pointer-events: auto !important;
+        }
+        #particleCanvas {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: -1 !important;
+            pointer-events: none !important;
+        }
+    </style>
 </head>
 
-<body class="main-page">
+<body class="main-page {% if not prediction %}home-view{% endif %}">
     <canvas id="particleCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
@@ -22,8 +40,8 @@
             </span>
         </button>
         <div id="profileMenu" class="profile-menu" role="menu">
-            <a href="/history" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128202;</span>History</a>
-            <a href="/logout" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128682;</span>Logout</a>
+            <a href="{{ url_for('history') }}" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128202;</span>History</a>
+            <a href="{{ url_for('logout') }}" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128682;</span>Logout</a>
         </div>
         {% else %}
         <a href="/login" class="login-btn">Login</a>
@@ -31,107 +49,62 @@
     </div>
 
     <main class="container">
-        <section class="header-section" aria-labelledby="chatgpt-center-title">
-            <div class="header-copy">
-                <h1 id="chatgpt-center-title">SafeRecruit AI</h1>
+    {% if not prediction %}
+    <!-- RESTORED OLD UI - EXACTLY AS SCREENSHOT -->
+    <div class="hero-logo">SAFERECRUIT AI</div>
+
+    <div class="extension-card">
+        <div class="ext-card-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="ext-card-icon" style="font-size: 24px;">🧩</span>
+                <div>
+                    <h3 class="ext-card-title" style="margin: 0; font-size: 1.05rem; color: #fff;">SafeRecruit Extension</h3>
+                    <p class="ext-card-note" style="margin: 2px 0 0; font-size: 0.8rem; color: #ef4444;">Required for direct job scanning</p>
+                </div>
             </div>
-        </section>
+            <a href="/static/chrome_extension.zip" download class="ext-download-btn" style="background: #3b82f6; color: white; padding: 7px 14px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.85rem;">
+                Download ZIP
+            </a>
+        </div>
+        <div class="ext-already-installed" style="background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.2); padding: 12px 16px; border-radius: 12px; display: flex; gap: 12px; align-items: center;">
+            <span class="ext-already-icon" style="font-size: 1.2rem;">✅</span>
+            <div>
+                <p style="margin: 0; color: #cbd5e1; font-size: 0.85rem;"><strong>Already installed?</strong> Open a LinkedIn job and click the extension icon.</p>
+            </div>
+        </div>
+    </div>
 
-        {% if not prediction %}
-        <section class="form-section" aria-label="Job analysis form">
-            {% if error %}
-            <div class="error-box" role="alert">{{ error }}</div>
-            {% endif %}
+    <form method="POST" id="jobForm" enctype="multipart/form-data" class="home-chatbox">
+        <!-- Image thumbnail preview area -->
+        <div id="imagePreview" class="img-preview-row" style="display: none; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+            <div style="position: relative; display: inline-block;">
+                <img id="imgPreviewThumb" src="" style="height: 60px; width: 60px; object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.2);">
+                <button type="button" id="imgRemoveBtn" class="img-thumb-remove" style="position: absolute; top: -8px; right: -8px; background: #ef4444; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 12px;">×</button>
+            </div>
+            <span id="imgFileName" class="img-file-name" style="margin-left: 12px; font-size: 0.85rem; color: #94a3b8;"></span>
+        </div>
 
-            <form method="POST" id="jobForm" enctype="multipart/form-data">
-
-                <!-- ChatGPT prompt bar: upload + textarea inline -->
-                <div class="form-group chatgpt-input-wrapper">
-                    <div class="chatgpt-bar">
-                        <!-- Image thumbnail preview area (inside the rounded box) -->
-                        <div id="imgPreviewArea" class="img-preview-area">
-                            <div class="img-thumb-wrapper">
-                                <img id="imgPreviewThumb" class="img-preview-thumb" src="" alt="Uploaded image preview">
-                                <button type="button" id="imgRemoveBtn" class="img-thumb-remove"
-                                    title="Remove image">&times;</button>
-                            </div>
-                            <span id="imgFileName" class="img-file-name"></span>
-                        </div>
-
-                        <!-- Input row: textarea + actions -->
-                        <div class="chatgpt-input-row">
-                            <div class="chatgpt-content-area">
-                                <textarea id="jobInput" name="job_input" class="textarea-input" rows="1"
-                                    placeholder="Analyze a job posting for fraud signals..." style="overflow:hidden;"
-                                    oninput="this.style.height = ''; this.style.height = this.scrollHeight + 'px'">{{ original_text }}</textarea>
-                            </div>
-
-                            <div class="chatgpt-actions-right">
-                                <label for="fileUploadInline" class="upload-label-inline" title="Upload screenshot">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                        <path
-                                            d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48">
-                                        </path>
-                                    </svg>
-                                    <input type="file" id="fileUploadInline" name="job_image" accept="image/*" hidden>
-                                </label>
-                                <button type="submit" id="analyzeBtn" class="submit-btn chatgpt-send-btn">
-                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M2 21L23 12 2 3v7l15 2-15 2z" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Resume Analysis Toggle / Section -->
-                <div class="resume-analysis-container">
-                    <button type="button" class="toggle-resume-btn" onclick="toggleResumeSection()">
-                        <span id="resumeToggleIcon">+</span> Add Resume for Semantic Matching (Optional)
-                    </button>
-                    
-                    <div id="resumeSection" class="resume-section-hidden">
-                        <div class="form-group">
-                            <label for="resumeInput" class="field-label">Paste Resume Content</label>
-                            <textarea id="resumeInput" name="resume_input" class="textarea-input" rows="5" placeholder="Paste your full resume here...">{{ resume_input }}</textarea>
-                        </div>
-                        
-                        <div class="metadata-grid">
-                            <div class="form-group">
-                                <label for="industry" class="field-label">Industry</label>
-                                <input type="text" id="industry" name="industry" class="text-input" placeholder="e.g. Fintech, Healthcare">
-                            </div>
-                            <div class="form-group">
-                                <label for="level" class="field-label">Experience Level</label>
-                                <select id="level" name="level" class="select-input">
-                                    <option value="">Select Level</option>
-                                    <option value="Junior">Junior / Entry Level</option>
-                                    <option value="Mid">Mid-Level</option>
-                                    <option value="Senior">Senior / Executive</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="location" class="field-label">Preferred Location</label>
-                                <input type="text" id="location" name="location" class="text-input" placeholder="e.g. Remote, New York">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Live word count -->
-                <div id="wordCountBar" style="padding: 4px 2px 0; min-height: 20px;">
-                    <span id="wordCount"
-                        style="font-size:0.78rem; color:var(--muted); font-weight:600; letter-spacing:0.03em;"></span>
-                </div>
-
-
-            </form>
-
-        </section>
-
-        {% else %}
+        <div class="chatbox-input-row">
+            <input type="file" name="job_image" id="jobImageInput" accept="image/*" hidden>
+            <button type="button" class="chatbox-icon-btn" onclick="document.getElementById('jobImageInput').click()">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                    <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                    <polyline points="21 15 16 10 5 21"></polyline>
+                </svg>
+            </button>
+            <textarea id="jobInput" name="job_input" class="chatbox-textarea" rows="1"
+                placeholder="Paste a job URL or job description here..."
+                oninput="autoResize(this)">{{ original_text }}</textarea>
+            <button type="submit" id="analyzeBtn" class="chatbox-send-btn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                </svg>
+            </button>
+        </div>
+    </form>
+    
+    {% else %}
         <section class="results-section" aria-label="Analysis results">
             <div class="result-card {{ prediction|lower }}">
                 <div class="result-main">
@@ -140,20 +113,17 @@
                         {% elif prediction == "REAL" %}&#10003;
                         {% else %}?{% endif %}
                     </span>
-                    <div class="result-header">
-                        <div class="header-left">
-                            <h2 class="result-title">Intelligence Report</h2>
-                            <p class="result-subtitle">ID: #{{ range(1000, 9999)|random }}-SR</p>
-                        </div>
-                        <div class="header-actions">
-                            <button class="btn-export" onclick="downloadReport()" title="Download as Text">
-                                <span class="icon">💾</span> Export Report
-                            </button>
-                            <div class="verdict-badge {{ prediction|lower }}">
-                                {{ prediction }}
-                            </div>
+                <div class="result-header fade-in">
+                    <div class="header-left">
+                        <h2 class="result-title">Forensic Verdict</h2>
+                        <p class="result-subtitle">ID: #{{ range(1000, 9999)|random }}-SR</p>
+                    </div>
+                    <div class="header-actions">
+                        <div class="verdict-main {{ prediction|lower }}">
+                            {{ prediction }}
                         </div>
                     </div>
+                </div>
                 </div>
                 <div class="result-stats" aria-label="Prediction statistics">
                     <div class="stat">
@@ -174,22 +144,27 @@
             </div>
             {% endif %}
 
-            <div class="analysis-card">
-                <h3><span class="section-icon" aria-hidden="true">&#128202;</span>Risk Assessment</h3>
-                <div class="meter" aria-hidden="true">
-                    <div class="meter-bar" style="width: {{ risk }}%"></div>
-                </div>
-                <p class="risk-text">{{ risk }}% Scam Risk</p>
-                <p class="category-badge">{{ category }}</p>
-                
-                {% if prediction == "FAKE" and resume_input %}
-                <div class="scam-data-warning">
-                    <span class="warning-icon">⚠️</span>
-                    <div class="warning-content">
-                        <strong>Security Alert:</strong> Matching suppressed. We strongly advise against sending your resume to this company. Fake jobs are often used to collect sensitive personal data for identity theft.
+            <div class="analysis-card fade-in" style="animation-delay: 0.1s;">
+                <h3><span class="section-icon" aria-hidden="true">&#128202;</span>Forensic Health Check</h3>
+                <div class="metric-row">
+                    <div class="metric-label-group" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span class="metric-name" style="font-size: 0.9rem; color: var(--ink-soft); font-weight: 600;">Scam Risk</span>
+                        <span class="metric-val" style="font-weight: 700; color: var(--red);">{{ risk }}%</span>
+                    </div>
+                    <div class="risk-bar-container">
+                        <div class="risk-bar-fill {% if risk < 30 %}safe{% elif risk < 60 %}warning{% else %}danger{% endif %}" style="width: {{ risk }}%"></div>
                     </div>
                 </div>
-                {% endif %}
+                <div class="metric-row" style="margin-top: 16px;">
+                    <div class="metric-label-group" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span class="metric-name" style="font-size: 0.9rem; color: var(--ink-soft); font-weight: 600;">Trust Score</span>
+                        <span class="metric-val" style="font-weight: 700; color: var(--green);">{{ trust_score|default(100 - risk) }}%</span>
+                    </div>
+                    <div class="risk-bar-container">
+                        <div class="risk-bar-fill safe" style="width: {{ trust_score|default(100 - risk) }}%; background: var(--green);"></div>
+                    </div>
+                </div>
+                <p class="category-badge" style="margin-top: 15px;">{{ category }}</p>
             </div>
 
             {% if fraud_risk_score is defined and fraud_risk_score is not none %}
@@ -237,17 +212,7 @@
                         </div>
                     </div>
 
-                    <div class="metric-item">
-                        <div class="metric-header">
-                            <span class="metric-label">&#127919; Match Accuracy</span>
-                            <span
-                                class="metric-value {% if match_score > 75 %}metric-safe{% elif match_score > 40 %}metric-warning{% else %}metric-danger{% endif %}">{{
-                                match_score }}/100</span>
-                        </div>
-                        <div class="metric-bar-track">
-                            <div class="metric-bar-fill metric-fill-safe" style="width: {{ match_score }}%"></div>
-                        </div>
-                    </div>
+
 
                 </div>
             </div>
@@ -259,60 +224,13 @@
                 <p class="scout-text">"{{ scout_summary }}"</p>
                 <div class="scout-meta">
                     <span class="scout-tag">Initial Risk: {{ initial_risk }}%</span>
-                    <span class="scout-tag">Initial Match: {{ initial_match }}%</span>
                 </div>
             </div>
             {% endif %}
 
-            {% if match_score > 0 %}
-            <div class="analysis-card match-intelligence-card">
-                <h3><span class="section-icon" aria-hidden="true">&#127891;</span>Match Intelligence</h3>
-                <div class="match-meta">
-                    <span class="match-badge">Confidence: {{ match_confidence }}</span>
-                </div>
-                
-                <div class="match-grid">
-                    <div class="match-column">
-                        <h4><span class="col-icon">✅</span> Key Matches</h4>
-                        <ul class="match-list">
-                            {% for m in key_matches %}
-                            <li>{{ m }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                    <div class="match-column">
-                        <h4><span class="col-icon">⚠️</span> Critical Gaps</h4>
-                        <ul class="gap-list">
-                            {% for g in key_gaps %}
-                            <li>{{ g }}</li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
 
-                {% if recommendations %}
-                <div class="recommendations-section">
-                    <h4><span class="col-icon">💡</span> Recommendations</h4>
-                    <ul class="rec-list">
-                        {% for r in recommendations %}
-                        <li>{{ r }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-            </div>
-            {% endif %}
 
-            {% if optimized_resume %}
-            <div class="analysis-card optimized-resume-card">
-                <div class="card-header-flex">
-                    <h3><span class="section-icon" aria-hidden="true">&#10024;</span>Tailored Resume Improvement</h3>
-                    <button class="btn-copy-resume" onclick="copyToClipboard('optimizedResumeContent')">Copy Text</button>
-                </div>
-                <p class="resume-tip">This version highlights your relevant skills specifically for this role.</p>
-                <div id="optimizedResumeContent" class="resume-content-preview">{{ optimized_resume|safe }}</div>
-            </div>
-            {% endif %}
+
 
             {% if highlighted_text %}
             <div class="analysis-card">
@@ -329,6 +247,15 @@
                     <li class="finding-item">{{ r }}</li>
                     {% endfor %}
                 </ul>
+            </div>
+            {% endif %}
+
+            {% if why_risky %}
+            <div class="analysis-card reasoning-explanation-card">
+                <h3><span class="section-icon" aria-hidden="true">&#128737;</span>Why this is risky</h3>
+                <div class="forensic-explanation">
+                    <p class="explanation-text">{{ why_risky }}</p>
+                </div>
             </div>
             {% endif %}
 
@@ -349,7 +276,7 @@
                     </span>
                 </div>
 
-                {% if final_reasoning %}
+                {% if final_reasoning and final_reasoning != 'Analysis complete.' %}
                 <p class="final-reasoning-text">{{ final_reasoning }}</p>
                 {% endif %}
 
@@ -416,9 +343,12 @@
             </div>
             {% endif %}
 
-            {% if suggestions %}
-            <div class="analysis-card">
-                <h3><span class="section-icon" aria-hidden="true">&#128161;</span>Safety Tips</h3>
+            {% if suggestions or final_advice %}
+            <div class="analysis-card safety-advice-card">
+                <h3><span class="section-icon" aria-hidden="true">&#128161;</span>Safety Advice</h3>
+                {% if final_advice %}
+                <p class="final-advice-text">{{ final_advice }}</p>
+                {% endif %}
                 <ul class="tips-list">
                     {% for s in suggestions %}
                     <li class="tip-item">{{ s }}</li>
@@ -504,15 +434,16 @@
     </main>
 
     <!-- Modern Searching Loader — FULL SCREEN CENTERED -->
-    <!-- Modern ChatGPT-style Loader -->
     <div id="loader" class="searching-overlay" style="display: none;" aria-live="polite">
-        <div class="loader-container">
-            <div class="chatgpt-loader">
-                <div class="dot"></div>
-                <div class="dot"></div>
-                <div class="dot"></div>
+        <div class="loader-content">
+            <div class="pulse-loader">
+                <div class="pulse-dot"></div>
+                <div class="pulse-dot"></div>
+                <div class="pulse-dot"></div>
             </div>
-            <p id="loaderText" class="status-messages">Analyzing forensics...</p>
+            <div class="loader-status-container">
+                <p id="loaderText" class="loader-status-text">Initializing forensic scan...</p>
+            </div>
         </div>
     </div>
 
@@ -541,7 +472,7 @@
         }
     </script>
 
-    <script src="{{ url_for('static', filename='script.js') }}?v=5"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=6"></script>
     <script>
         function toggleGuide() {
             const popup = document.getElementById('guidePopup');
@@ -551,12 +482,11 @@
 
         // === Image Thumbnail Preview (ChatGPT-style) ===
         (function () {
-            var previewArea = document.getElementById('imgPreviewArea');
+            var previewArea = document.getElementById('imagePreview');
             var thumbEl = document.getElementById('imgPreviewThumb');
             var nameEl = document.getElementById('imgFileName');
             var removeBtn = document.getElementById('imgRemoveBtn');
-            var inlineInput = document.getElementById('fileUploadInline');
-            var standaloneInput = document.getElementById('fileUpload');
+            var inputEl = document.getElementById('jobImageInput');
 
             function showPreview(file) {
                 if (!file || !previewArea || !thumbEl) return;
@@ -565,7 +495,7 @@
                     reader.onload = function (e) {
                         thumbEl.src = e.target.result;
                         if (nameEl) nameEl.textContent = file.name.length > 25 ? file.name.slice(0, 22) + '...' : file.name;
-                        previewArea.style.display = 'flex'; /* Show as flex inside the box */
+                        previewArea.style.display = 'flex'; 
                     };
                     reader.readAsDataURL(file);
                 }
@@ -575,18 +505,12 @@
                 if (previewArea) previewArea.style.display = 'none';
                 if (thumbEl) thumbEl.src = '';
                 if (nameEl) nameEl.textContent = '';
-                if (inlineInput) inlineInput.value = '';
-                if (standaloneInput) standaloneInput.value = '';
+                if (inputEl) inputEl.value = '';
             }
 
             // Attach change listeners
-            if (inlineInput) {
-                inlineInput.addEventListener('change', function () {
-                    if (this.files && this.files[0]) showPreview(this.files[0]);
-                });
-            }
-            if (standaloneInput) {
-                standaloneInput.addEventListener('change', function () {
+            if (inputEl) {
+                inputEl.addEventListener('change', function () {
                     if (this.files && this.files[0]) showPreview(this.files[0]);
                 });
             }
@@ -605,10 +529,10 @@
                 for (var i = 0; i < items.length; i++) {
                     if (items[i].type.indexOf('image/') === 0) {
                         var file = items[i].getAsFile();
-                        if (file && inlineInput) {
+                        if (file && inputEl) {
                             var dt = new DataTransfer();
                             dt.items.add(file);
-                            inlineInput.files = dt.files;
+                            inputEl.files = dt.files;
                             showPreview(file);
                         }
                         break;
@@ -620,26 +544,49 @@
             window.clearUpload = hidePreview;
         })();
 
-        // Fix: On form submit, disable the unused file input so duplicate name="job_image" doesn't cause issues
+        function toggleMenu(btn) {
+            const menu = document.getElementById('profileMenu');
+            const isExpanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', !isExpanded);
+            menu.classList.toggle('show');
+            
+            // Close menu when clicking outside
+            const closeMenu = (e) => {
+                if (!btn.contains(e.target) && !menu.contains(e.target)) {
+                    menu.classList.remove('show');
+                    btn.setAttribute('aria-expanded', 'false');
+                    document.removeEventListener('click', closeMenu);
+                }
+            };
+            
+            if (!isExpanded) {
+                setTimeout(() => document.addEventListener('click', closeMenu), 0);
+            }
+        }
+
+        // Form submit: show overlay + loading state
         var form = document.getElementById('jobForm');
         if (form) {
             form.addEventListener('submit', function () {
                 var overlay = document.getElementById('loader');
                 if (overlay) overlay.style.display = 'flex';
+                var btn = document.getElementById('analyzeBtn');
+                if (btn) {
+                    btn.classList.add('analyzing');
+                    btn.disabled = true;
+                }
             });
         }
 
-        function toggleResumeSection() {
-            const section = document.getElementById('resumeSection');
-            const icon = document.getElementById('resumeToggleIcon');
-            if (section.classList.contains('resume-section-hidden')) {
-                section.classList.remove('resume-section-hidden');
-                section.classList.add('resume-section-visible');
-                icon.textContent = '-';
-            } else {
-                section.classList.add('resume-section-hidden');
-                section.classList.remove('resume-section-visible');
-                icon.textContent = '+';
+        function autoResize(el) {
+            el.style.height = '';
+            el.style.height = Math.min(el.scrollHeight, 200) + 'px';
+            
+            // Update word count
+            var wc = document.getElementById('wordCount');
+            if (wc) {
+                var words = el.value.trim().split(/\s+/).filter(Boolean).length;
+                wc.textContent = words > 0 ? words + ' words' : '';
             }
         }
 

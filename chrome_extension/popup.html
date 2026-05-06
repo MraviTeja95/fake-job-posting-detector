@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>SafeRecruit AI</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      width: 360px;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f1117;
+      color: #e0e0e0;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 18px;
+      background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .header p {
+      font-size: 11px;
+      color: #888;
+    }
+    #scan-btn {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #7b2ff7, #00d4ff);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    #scan-btn:hover { opacity: 0.9; }
+    #scan-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .status {
+      margin-top: 12px;
+      font-size: 12px;
+      color: #aaa;
+      text-align: center;
+      min-height: 18px;
+    }
+    .result-box {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #1a1d27;
+      border: 1px solid #2a2d3a;
+      display: none;
+    }
+    .result-box.show { display: block; }
+    .verdict {
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .verdict.REAL { color: #00e676; }
+    .verdict.SUSPICIOUS { color: #ffab00; }
+    .verdict.FAKE { color: #ff1744; }
+    .meta-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid #2a2d3a;
+    }
+    .meta-row:last-child { border-bottom: none; }
+    .meta-label { color: #888; }
+    .meta-value { font-weight: 600; }
+    .reasons {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #bbb;
+    }
+    .reasons li {
+      margin-bottom: 3px;
+      list-style: none;
+    }
+    .error-msg {
+      margin-top: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      background: rgba(255, 23, 68, 0.1);
+      border: 1px solid #ff1744;
+      color: #ff6b6b;
+      font-size: 12px;
+      text-align: center;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>🛡️ SafeRecruit AI</h1>
+    <p>LinkedIn Job Fraud Scanner</p>
+  </div>
+
+  <button id="scan-btn">Scan This Job Posting</button>
+  <div class="status" id="status"></div>
+  <div class="error-msg" id="error"></div>
+
+  <div class="result-box" id="result">
+    <div class="verdict" id="verdict"></div>
+    <div class="meta-row">
+      <span class="meta-label">Confidence</span>
+      <span class="meta-value" id="confidence"></span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Fraud Risk</span>
+      <span class="meta-value" id="fraud-risk"></span>
+    </div>
+    <div class="meta-row" style="justify-content: center;">
+      <span class="meta-value" id="trust-score"></span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">Engine</span>
+      <span class="meta-value" id="engine"></span>
+    </div>
+    <ul class="reasons" id="reasons"></ul>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

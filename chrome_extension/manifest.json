@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "SafeRecruit AI - LinkedIn Job Scanner",
+  "version": "1.0",
+  "description": "Extract LinkedIn job postings and analyze them for fraud using SafeRecruit AI.",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.linkedin.com/*",
+    "http://127.0.0.1:5000/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SafeRecruit AI Scanner"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.linkedin.com/jobs/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {}
+}
