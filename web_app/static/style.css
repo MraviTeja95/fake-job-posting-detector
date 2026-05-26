@@ -1,4 +1,114 @@
+/* =========================================================
+   GLOBAL AI THEME — SafeRecruit AI (White Futuristic)
+   Applies to ALL pages via body.ai-theme
+========================================================= */
+
+body.ai-theme,
+body.history-page,
+body.main-page {
+    margin: 0;
+    min-height: 100vh;
+    overflow-x: hidden;
+    background: transparent !important;
+    font-family: Inter, 'Outfit', sans-serif;
+    color: #111827;
+}
+
+/* Wave canvas — global, sits behind everything */
+body.ai-theme #waveCanvas,
+body.history-page #waveCanvas,
+body.main-page #waveCanvas {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: -1 !important;
+    pointer-events: none !important;
+}
+
+/* =========================================================
+   GLASS CARD UTILITY — reusable across all pages
+========================================================= */
+
+.glass-card {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(28px) saturate(160%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(160%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.55) !important;
+    border-radius: 32px !important;
+    position: relative;
+    overflow: hidden;
+}
+
+.glass-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.30),
+        rgba(255, 255, 255, 0.06)
+    );
+    pointer-events: none;
+    z-index: 0;
+}
+
+.glass-card > * {
+    position: relative;
+    z-index: 1;
+}
+
+/* Stat / chart cards on dashboard & history */
+.stat-card,
+.chart-card,
+.history-item {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.50) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05) !important;
+    color: #111827 !important;
+}
+
+.stat-value { color: #22c55e !important; }
+.stat-label { color: #6b7280 !important; }
+
+/* Container on interior pages */
+body.ai-theme .container,
+body.history-page .container {
+    background: transparent !important;
+}
+
+/* Headings on interior pages */
+body.ai-theme h1,
+body.history-page h1,
+body.ai-theme .eyebrow,
+body.history-page .eyebrow {
+    color: #0f172a !important;
+}
+
+body.ai-theme p.guide,
+body.history-page p.guide {
+    color: #4b5563 !important;
+}
+
+/* Chart.js light theme override */
+body.ai-theme canvas,
+body.history-page canvas {
+    color: #374151 !important;
+}
+
+/* =========================================================
+   END GLOBAL THEME
+========================================================= */
+
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
+
 
 :root {
 
@@ -1674,7 +1784,7 @@ input[type="email"]:focus {
 
     }
 
-    .profile-wrapper, .hide-on-print, .action-buttons, #particleCanvas {
+    .profile-wrapper, .hide-on-print, .action-buttons {
 
     }
 
@@ -4213,20 +4323,13 @@ body {
 }
 
 .resume-content-preview {
-
     padding: 24px;
-
-    background: rgba(0, 0, 0, 0.3);
-
+    background: rgba(255, 255, 255, 0.12);
     border-radius: var(--radius-sm);
-
     font-family: 'Courier New', Courier, monospace;
-
     font-size: 0.95rem;
-
     line-height: 1.6;
-
-    color: #e0e0e0;
+    color: #111827;
 
     white-space: pre-wrap;
 
@@ -5157,38 +5260,46 @@ body.home-view main.container {
 /* FLOATING CHATBOX AT BOTTOM */
 #jobForm.home-chatbox {
     position: fixed !important;
-    bottom: 40px !important;
+    bottom: 32px !important;
     left: 50% !important;
     transform: translateX(-50%) !important;
-    width: 58% !important;
-    height: 70px !important;
-    background: rgba(15, 23, 42, 0.5) !important;
+    width: min(820px, 90%) !important;
+    min-height: 60px !important;
+    height: auto !important;
+    background: rgba(15, 23, 42, 0.6) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.12) !important;
     border-radius: 24px !important;
-    padding: 0 20px !important;
+    padding: 0 16px !important;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
     display: flex !important;
-    flex-direction: row !important;
+    flex-direction: column !important;
+    z-index: 9999 !important;
+}
+
+#jobForm.home-chatbox .chatbox-input-row {
+    display: flex !important;
     align-items: center !important;
     gap: 12px !important;
-    z-index: 9999 !important;
+    padding: 12px 4px !important;
+    width: 100% !important;
 }
 
 .chatbox-textarea {
     flex: 1 !important;
     background: transparent !important;
     border: none !important;
-    color: #ffffff !important;
+    color: #111827 !important;
     font-size: 1rem !important;
     resize: none !important;
     outline: none !important;
-    padding: 24px 0 !important;
-    line-height: 1.4 !important;
-    height: 70px !important;
+    padding: 8px 0 !important;
+    line-height: 1.5 !important;
+    min-height: 36px !important;
+    max-height: 140px !important;
     box-sizing: border-box !important;
-    overflow: hidden !important;
+    overflow-y: auto !important;
 }
 
 .chatbox-send-btn {
@@ -5202,5 +5313,1982 @@ body.home-view main.container {
     align-items: center !important;
     justify-content: center !important;
     cursor: pointer !important;
+    flex-shrink: 0 !important;
+    transition: transform 0.2s, box-shadow 0.2s !important;
 }
 
+.chatbox-send-btn:hover {
+    transform: scale(1.06) !important;
+    box-shadow: 0 0 18px rgba(34, 197, 94, 0.45) !important;
+}
+
+/* ==========================================================================
+   SAFERECRUIT AI - 3D WAVE CANVAS & PREMIUM LOGIN CARD RESTORATION
+   ========================================================================== */
+
+/* Scope canvas rules to auth-page ONLY — don't affect main page */
+.auth-page #waveCanvas {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: -2 !important;
+    pointer-events: none !important;
+    display: block !important;
+}
+
+
+
+body.auth-page {
+    margin: 0 !important;
+    min-height: 100vh !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: transparent !important;
+    overflow: hidden !important;
+}
+
+.login-wrapper {
+    width: 100% !important;
+    max-width: 440px !important;
+    padding: 24px !important;
+    z-index: 10 !important;
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+.login-card {
+    background: rgba(255, 255, 255, 0.18) !important;
+    backdrop-filter: blur(32px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(180%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.70) !important;
+    border-radius: 36px !important;
+    padding: 52px 42px !important;
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.04),
+        inset 0 1px 1px rgba(255, 255, 255, 0.90) !important;
+    width: 430px !important;
+    max-width: 95% !important;
+    transition: all 0.3s ease !important;
+}
+
+.login-card:hover {
+    background: rgba(255, 255, 255, 0.24) !important;
+    border-color: rgba(255, 255, 255, 0.85) !important;
+    box-shadow:
+        0 16px 48px rgba(0, 0, 0, 0.10),
+        inset 0 1px 1px rgba(255, 255, 255, 0.95) !important;
+    transform: translateY(-2px);
+}
+
+.login-title {
+    font-size: 2.2rem !important;
+    letter-spacing: -0.02em !important;
+    margin-top: 0 !important;
+    margin-bottom: 36px !important;
+    text-align: center !important;
+    color: #111827 !important;
+    text-shadow: none !important;
+}
+
+.login-subtitle {
+    display: none !important;
+}
+
+.login-card .field-group {
+    margin-bottom: 20px !important;
+}
+
+.login-card .field-group input {
+    width: 100% !important;
+    min-height: 54px !important;
+    padding: 0 18px !important;
+    background: rgba(255, 255, 255, 0.55) !important;
+    border: 1px solid rgba(0, 0, 0, 0.12) !important;
+    border-radius: 16px !important;
+    color: #111827 !important;
+    font-size: 0.95rem !important;
+    outline: none !important;
+    transition: all 0.2s ease !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+.login-card .field-group input:focus {
+    border-color: rgba(255, 255, 255, 0.90) !important;
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.20) !important;
+    background: rgba(255, 255, 255, 0.75) !important;
+}
+
+.login-card .btn-login {
+    width: 100% !important;
+    min-height: 54px !important;
+    background: #22c55e !important;
+    color: #020617 !important;
+    border: none !important;
+    border-radius: 12px !important;
+    font-weight: 700 !important;
+    font-size: 0.95rem !important;
+    letter-spacing: 0.05em !important;
+    text-transform: uppercase !important;
+    cursor: pointer !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.2) !important;
+    margin-top: 24px !important;
+}
+
+.login-card .btn-login:hover {
+    background: #4ade80 !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 10px 25px rgba(34, 197, 94, 0.35) !important;
+}
+
+.login-card .btn-login:active {
+    transform: translateY(0) !important;
+}
+
+.login-note {
+    margin-top: 24px !important;
+    color: #94a3b8 !important;
+    font-size: 0.9rem !important;
+    text-align: center !important;
+    line-height: 1.5 !important;
+}
+
+.login-note a.auth-link {
+    color: #22c55e !important;
+    text-decoration: none !important;
+    font-weight: 600 !important;
+    transition: color 0.2s !important;
+}
+
+.login-note a.auth-link:hover {
+    color: #4ade80 !important;
+    text-decoration: underline !important;
+}
+
+.error-box {
+    background: rgba(239, 68, 68, 0.1) !important;
+    border: 1px solid rgba(239, 68, 68, 0.2) !important;
+    color: #fca5a5 !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    font-size: 0.9rem !important;
+    margin-bottom: 20px !important;
+    text-align: center !important;
+}
+
+.success-box {
+    background: rgba(34, 197, 94, 0.1) !important;
+    border: 1px solid rgba(34, 197, 94, 0.2) !important;
+    color: #86efac !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    font-size: 0.9rem !important;
+    margin-bottom: 20px !important;
+    text-align: center !important;
+}
+
+
+/* =========================================================
+   PREMIUM LOGIN PAGE
+========================================================= */
+
+.auth-page {
+    margin: 0;
+    overflow: hidden;
+    background: transparent;
+    font-family: Inter, sans-serif;
+    min-height: 100vh;
+}
+
+/* 3D Wave Background */
+#waveCanvas {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+}
+
+.login-wrapper {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+}
+
+/* =========================================================
+   PREMIUM GLASS LOGIN CARD — matches reference design
+========================================================= */
+
+.login-card {
+
+    width: 430px;
+    max-width: 95%;
+
+    padding: 52px 42px;
+
+    border-radius: 36px;
+
+    position: relative;
+
+    overflow: hidden;
+
+    /* WHITE GLASS */
+    background: rgba(255, 255, 255, 0.25);
+
+    /* GLASS BLUR */
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+
+    /* SOFT GLASS BORDER */
+    border: 1px solid rgba(255,255,255,0.55);
+
+    /* PREMIUM SOFT SHADOW */
+    box-shadow:
+        0 10px 40px rgba(0,0,0,0.06),
+        inset 0 1px 1px rgba(255,255,255,0.65);
+
+    z-index: 10;
+
+    animation: fadeUp 0.8s ease;
+}
+
+.login-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(255,255,255,0.12),
+            rgba(255,255,255,0.03)
+        );
+    pointer-events: none;
+}
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.login-title {
+
+    font-size: 54px;
+
+    font-weight: 700;
+
+    color: #111827;
+
+    text-align: center;
+
+    margin-bottom: 42px;
+
+    letter-spacing: -1px;
+}
+
+/* Hide subtitle to match reference */
+.login-subtitle {
+    display: none;
+}
+
+/* =========================================================
+   INPUT ICON WRAPPER
+========================================================= */
+
+.field-group {
+    margin-bottom: 14px;
+}
+
+.input-icon-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.input-icon {
+    position: absolute;
+    left: 16px;
+    color: #9ca3af;
+    pointer-events: none;
+    flex-shrink: 0;
+}
+
+/* =========================================================
+   INPUTS
+========================================================= */
+
+.field-group input {
+
+    width: 100%;
+
+    padding: 18px 20px;
+
+    border-radius: 18px;
+
+    border: 1px solid rgba(255,255,255,0.45);
+
+    background: rgba(255,255,255,0.12);
+
+    backdrop-filter: blur(12px);
+
+    color: #111827;
+
+    font-size: 16px;
+
+    outline: none;
+
+    transition: all 0.3s ease;
+}
+
+.field-group input::placeholder {
+    color: #9ca3af;
+}
+
+/* INPUT FOCUS */
+.field-group input:focus {
+
+    background: rgba(255,255,255,0.22);
+
+    border: 1px solid rgba(255,255,255,0.7);
+
+    box-shadow: 0 0 0 4px rgba(255,255,255,0.12);
+}
+
+/* =========================================================
+   SIGN IN BUTTON — bright green like reference
+========================================================= */
+
+.btn-login {
+    width: 100%;
+    margin-top: 8px;
+
+    padding: 17px;
+
+    border: none;
+    border-radius: 16px;
+
+    background: #22c55e;
+
+    color: #ffffff;
+
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+
+    cursor: pointer;
+
+    transition: all 0.25s ease;
+
+    box-shadow: 0 4px 20px rgba(34, 197, 94, 0.30);
+}
+
+.btn-login:hover {
+    background: #16a34a;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(34, 197, 94, 0.38);
+}
+
+.btn-login:active {
+    transform: translateY(0);
+}
+
+/* =========================================================
+   SIGN UP LINK
+========================================================= */
+
+.login-note {
+    text-align: right;
+    margin-top: 20px;
+    color: #6b7280;
+    font-size: 14px;
+}
+
+.login-note a {
+    color: #111827;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* =========================================================
+   ERROR BOX
+========================================================= */
+
+.error-box {
+    background: rgba(239, 68, 68, 0.08) !important;
+    border: 1px solid rgba(239, 68, 68, 0.18) !important;
+    color: #dc2626 !important;
+    padding: 12px 16px !important;
+    border-radius: 12px !important;
+    margin-bottom: 20px !important;
+    font-size: 14px !important;
+}
+
+@keyframes fadeUp {
+    from {
+        opacity: 0;
+        transform: translateY(18px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+
+/* =========================================================
+   TOP ACTIONS
+========================================================= */
+
+.top-actions {
+    position: fixed;
+    top: 20px;
+    right: 24px;
+
+    display: flex;
+    gap: 12px;
+
+    z-index: 9999;
+}
+
+.top-btn {
+    padding: 10px 18px;
+
+    border-radius: 14px;
+
+    background: rgba(255,255,255,0.08);
+
+    backdrop-filter: blur(10px);
+
+    border: 1px solid rgba(255,255,255,0.08);
+
+    color: white;
+
+    text-decoration: none;
+
+    font-size: 14px;
+    font-weight: 600;
+
+    transition: 0.3s ease;
+}
+
+.top-btn:hover {
+    transform: translateY(-2px);
+
+    background: rgba(255,255,255,0.14);
+}
+
+.logout-btn {
+    background: rgba(255, 0, 0, 0.12);
+    border: 1px solid rgba(255,0,0,0.18);
+}
+
+}
+
+.logout-btn:hover {
+    background: rgba(255,0,0,0.22);
+}
+
+
+/* =========================================================
+   MAIN PAGE — WHITE FUTURISTIC THEME
+   Matches login page premium style
+   Does NOT touch .login-card or wave particles
+========================================================= */
+
+body.main-page {
+    background: transparent !important;
+    color: #111827;
+}
+
+/* Main containers — glass effect */
+body.main-page .main-container,
+body.main-page .hero-section,
+body.main-page .extension-card,
+body.main-page .analysis-container {
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 30px;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.45);
+}
+
+
+
+/* Result page cards */
+body.main-page .result-card,
+body.main-page .result-section,
+body.main-page .risk-card,
+body.main-page .analysis-card,
+body.main-page .output-card,
+body.main-page .form-section {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.50) !important;
+    border-radius: 28px !important;
+    box-shadow: 0 10px 38px rgba(0, 0, 0, 0.08) !important;
+    color: #111827 !important;
+}
+
+/* Headings */
+body.main-page h1,
+body.main-page h2,
+body.main-page h3 {
+    color: #111827;
+    letter-spacing: -0.5px;
+}
+
+/* Eyebrow labels */
+body.main-page .eyebrow {
+    color: #6b7280 !important;
+}
+
+body.main-page .guide {
+    color: #4b5563 !important;
+}
+
+/* Button shadows */
+body.main-page button,
+body.main-page .btn,
+body.main-page .btn-secondary,
+body.main-page .analyze-btn {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+
+/* =========================================================
+   LIGHT THEME - TEXT COLOR SYSTEM
+   Overrides dark-theme white text for the white background
+========================================================= */
+
+body.main-page,
+body.history-page,
+body.ai-theme {
+    color: #111827 !important;
+}
+
+body.main-page h1, body.main-page h2, body.main-page h3, body.main-page h4,
+body.history-page h1, body.history-page h2, body.history-page h3,
+body.ai-theme h1, body.ai-theme h2, body.ai-theme h3 {
+    color: #0f172a !important;
+    text-shadow: none !important;
+}
+
+body.main-page p, body.main-page span, body.main-page li, body.main-page label,
+body.history-page p, body.history-page span, body.history-page li,
+body.ai-theme p, body.ai-theme span, body.ai-theme li, body.ai-theme label {
+    color: #374151 !important;
+    text-shadow: none !important;
+}
+
+body.main-page .eyebrow, body.history-page .eyebrow, body.ai-theme .eyebrow {
+    color: #6b7280 !important;
+}
+
+body.main-page .guide, body.main-page .subtitle,
+body.history-page .guide, body.ai-theme .guide {
+    color: #4b5563 !important;
+}
+
+body.main-page ::placeholder,
+body.history-page ::placeholder,
+body.ai-theme ::placeholder {
+    color: #9ca3af !important;
+    opacity: 1 !important;
+}
+
+body.main-page input, body.main-page textarea, body.main-page select,
+body.history-page input, body.history-page select {
+    color: #111827 !important;
+}
+
+body.main-page a, body.history-page a, body.ai-theme a {
+    color: #374151 !important;
+}
+body.main-page a:hover, body.history-page a:hover {
+    color: #111827 !important;
+}
+
+body.main-page .ink-soft, body.main-page .text-muted,
+body.history-page .ink-soft, body.history-page .text-muted {
+    color: #6b7280 !important;
+}
+
+body.main-page .prediction-badge.fake       { color: #dc2626 !important; }
+body.main-page .prediction-badge.real       { color: #16a34a !important; }
+body.main-page .prediction-badge.suspicious { color: #d97706 !important; }
+
+body.history-page .history-time        { color: #6b7280 !important; }
+body.history-page .history-description { color: #374151 !important; }
+body.history-page .history-meta span   { color: #6b7280 !important; }
+body.history-page .history-meta strong { color: #0f172a !important; }
+
+body.ai-theme .stat-value { color: #22c55e !important; }
+body.ai-theme .stat-label { color: #6b7280 !important; }
+
+/* =========================================================
+   MAIN PAGE - WHITE FUTURISTIC THEME ENHANCEMENTS
+   Matches login page with glass effect & premium shadows
+========================================================= */
+
+/* ✅ MAIN PAGE BACKGROUND */
+body {
+    background: linear-gradient(to bottom, #ffffff, #f5f7fb);
+    color: #111827;
+}
+
+/* ✅ MAIN CONTAINER GLASS EFFECT */
+.main-container,
+.hero-section,
+.extension-card,
+.analysis-container {
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: 30px;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.45);
+}
+
+/* ✅ RESULT PAGE CARDS */
+.result-card,
+.result-section,
+.risk-card,
+.analysis-card {
+    background: rgba(255, 255, 255, 0.22);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 28px;
+    box-shadow: 0 10px 38px rgba(0, 0, 0, 0.08);
+}
+
+/* ✅ TITLE STYLE */
+h1, h2, h3 {
+    color: #111827;
+    letter-spacing: -0.5px;
+}
+
+/* ✅ BUTTON SHADOWS */
+button,
+.btn,
+.analyze-btn {
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+/* =========================================================
+   WHITE FUTURISTIC THEME — DEFINITIVE FIX
+   Root cause: :root CSS vars define a dark theme.
+   Fix: re-scope vars + target real HTML class names.
+   Scoped to body.main-page, body.history-page, body.ai-theme.
+   DOES NOT touch .login-card, .auth-page, or wave canvas.
+========================================================= */
+
+/* ── 1. RE-SCOPE CSS VARIABLES TO LIGHT THEME ── */
+/* This fixes ALL downstream rules that use var(--surface), etc. */
+
+body.main-page,
+body.history-page,
+body.ai-theme {
+    --page-bg:        #f5f7fb;
+    --surface:        rgba(255, 255, 255, 0.22);
+    --surface-strong: rgba(255, 255, 255, 0.35);
+    --surface-hover:  rgba(255, 255, 255, 0.30);
+    --ink:            #111827;
+    --ink-soft:       #6b7280;
+    --muted:          #9ca3af;
+    --line:           rgba(255, 255, 255, 0.55);
+    --line-strong:    rgba(255, 255, 255, 0.70);
+}
+
+/* ── 2. PAGE BACKGROUND ── */
+
+body:not(.auth-page) {
+    background: linear-gradient(to bottom, #ffffff, #f5f7fb) !important;
+    color: #111827 !important;
+}
+
+/* ── 3. MAIN CHATBOX / SEARCH CARD ── */
+/* Real class: <form class="home-chatbox"> in index.html */
+
+#jobForm.home-chatbox {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+}
+
+/* Textarea inside chatbox stays transparent (typed text visible) */
+.chatbox-textarea {
+    background: transparent !important;
+    color: #111827 !important;
+    border: none !important;
+}
+
+/* ── 4. EXTENSION CARD (main page top card) ── */
+/* Real class: <div class="extension-card"> in index.html */
+
+.extension-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 26px !important;
+}
+
+.ext-card-title  { color: #111827 !important; }
+.ext-card-note   { color: #ef4444 !important; }
+
+/* ── 5. RESULT CARD & ANALYSIS CARDS (main page after scan) ── */
+/* Real classes: <div class="result-card fake/real/suspicious">
+                 <div class="analysis-card"> in index.html */
+
+.result-card,
+.analysis-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+    color: #111827 !important;
+}
+
+/* Keep the colored left-border verdict indicators */
+.result-card.fake       { border-left: 6px solid #ef4444 !important; }
+.result-card.real       { border-left: 6px solid #22c55e !important; }
+.result-card.suspicious { border-left: 6px solid #f59e0b !important; }
+
+.result-card h2,
+.result-card h3,
+.analysis-card h3 { color: #111827 !important; }
+
+.result-card p,
+.result-card span,
+.analysis-card p,
+.result-subtitle  { color: #374151 !important; }
+
+/* Forensic sub-sections inside analysis cards */
+.forensic-sub-section {
+    background: rgba(255, 255, 255, 0.30) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+}
+
+/* Results section wrapper is transparent */
+.results-section { background: transparent !important; }
+
+/* ── 6. DASHBOARD PAGE ── */
+/* Real classes: .dashboard-shell, .dashboard-hero (header-section),
+                 .stats-summary, .stat-card, .chart-card, .dashboard-grid */
+
+.dashboard-shell,
+.stats-summary,
+.dashboard-grid,
+.premium-dashboard-grid { 
+    background: transparent !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+/* Dashboard header hero banner */
+.dashboard-page .header-section,
+.dashboard-hero {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+    padding: 40px 32px !important;
+    margin-bottom: 32px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+/* Stat cards in dashboard summary row */
+.stat-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.05),
+        inset 0 1px 1px rgba(255, 255, 255, 0.60) !important;
+    border-radius: 20px !important;
+    color: #111827 !important;
+    padding: 20px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 120px !important;
+}
+
+.stat-value {
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    color: #22c55e !important;
+    line-height: 1 !important;
+    margin-bottom: 8px !important;
+}
+
+.stat-label {
+    font-size: 12px !important;
+    color: #6b7280 !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+/* Chart cards in dashboard grid */
+.chart-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+    color: #111827 !important;
+    padding: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.chart-card h3 {
+    color: #111827 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    margin: 0 0 16px 0 !important;
+}
+
+.chart-card canvas {
+    max-height: 280px !important;
+    display: block !important;
+}
+.dashboard-hero h1    { color: #111827 !important; }
+.dashboard-hero-score span { color: #22c55e !important; }
+.dashboard-hero-score small { color: #6b7280 !important; }
+
+/* Activity rows inside chart card */
+.activity-row {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.30) !important;
+    padding: 12px 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+}
+
+.activity-row:last-child {
+    border-bottom: none !important;
+}
+
+.activity-text { 
+    color: #374151 !important;
+    font-size: 13px !important;
+    flex: 1 !important;
+}
+
+.activity-row strong {
+    color: #111827 !important;
+    font-weight: 700 !important;
+    min-width: 50px !important;
+}
+
+.prediction-badge {
+    padding: 4px 8px !important;
+    border-radius: 6px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    white-space: nowrap !important;
+}
+
+.prediction-badge.fake {
+    background: rgba(239, 68, 68, 0.15) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+}
+
+.prediction-badge.real {
+    background: rgba(34, 197, 94, 0.15) !important;
+    color: #22c55e !important;
+    border: 1px solid rgba(34, 197, 94, 0.3) !important;
+}
+
+.prediction-badge.suspicious {
+    background: rgba(245, 158, 11, 0.15) !important;
+    color: #f59e0b !important;
+    border: 1px solid rgba(245, 158, 11, 0.3) !important;
+}
+
+.activity-list {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+}
+
+.recent-activity-card .activity-list {
+    max-height: 400px !important;
+    overflow-y: auto !important;
+}
+
+/* ── 7. HISTORY PAGE ── */
+/* Real classes: .header-section, .history-panel (form-section),
+                 .history-list, .history-item (article) */
+
+.history-page .header-section {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+}
+
+.history-panel,
+.history-list { background: transparent !important; }
+
+/* Each history entry card */
+.history-item {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.05),
+        inset 0 1px 1px rgba(255, 255, 255, 0.60) !important;
+    border-radius: 22px !important;
+    color: #111827 !important;
+}
+
+.history-item:hover {
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.70) !important;
+    border-color: rgba(255, 255, 255, 0.75) !important;
+}
+
+.history-item-header   { border-bottom: 1px solid rgba(255, 255, 255, 0.35) !important; }
+.history-time          { color: #6b7280 !important; }
+.history-description   { color: #374151 !important; }
+.history-meta span     { color: #6b7280 !important; }
+.history-meta strong   { color: #111827 !important; }
+.history-details       { border-top: 1px solid rgba(255, 255, 255, 0.35) !important; }
+
+/* History search/filter inputs */
+.history-controls input,
+.history-controls select {
+    background: rgba(255, 255, 255, 0.30) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    color: #111827 !important;
+    border-radius: 12px !important;
+}
+
+/* ── 8. GUIDE POPUP (? button on main page) ── */
+/* Real classes: .guide-popup, .guide-header, .guide-body */
+
+.guide-popup {
+    background: rgba(255, 255, 255, 0.30) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.60) !important;
+    box-shadow:
+        0 10px 32px rgba(0, 0, 0, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.70) !important;
+    border-radius: 18px !important;
+}
+
+.guide-header {
+    background: rgba(255, 255, 255, 0.20) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.45) !important;
+    border-radius: 18px 18px 0 0 !important;
+}
+
+.guide-header h3 { color: #111827 !important; }
+.guide-body p    { color: #374151 !important; }
+
+/* ── 9. PROFILE / LOGOUT BUTTON (dashboard + history) ── */
+/* Real classes: .profile-wrapper, .profile-box, .avatar */
+
+.profile-box {
+    background: rgba(255, 255, 255, 0.28) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05) !important;
+}
+
+.profile-box:hover {
+    background: rgba(255, 255, 255, 0.38) !important;
+    border-color: rgba(255, 255, 255, 0.70) !important;
+}
+
+.profile-box .username { color: #111827 !important; }
+
+.avatar {
+    background: linear-gradient(135deg, #22c55e, #16a34a) !important;
+    color: #ffffff !important;
+}
+
+/* ── 10. TOP NAV BUTTONS (main page) ── */
+/* Real classes: .top-actions, .top-btn, .logout-btn */
+
+.top-actions { background: transparent !important; }
+
+.top-btn {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    color: #111827 !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05) !important;
+}
+
+.top-btn:hover {
+    background: rgba(255, 255, 255, 0.38) !important;
+    color: #0f172a !important;
+}
+
+/* ── 11. FEEDBACK CARD ── */
+
+.feedback-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+}
+
+.fb-label {
+    background: rgba(255, 255, 255, 0.30) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    color: #111827 !important;
+}
+
+/* ── 12. SHARED INNER ELEMENTS ── */
+
+/* Forensic list rows */
+.consistency-status,
+.validation-gate-status {
+    background: rgba(255, 255, 255, 0.25) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* Failed gates warning box */
+.failed-gates-section {
+    background: rgba(239, 68, 68, 0.05) !important;
+    border: 1px dashed rgba(239, 68, 68, 0.30) !important;
+}
+
+.failed-gates-list li {
+    background: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Metric bar tracks */
+.metric-bar-track {
+    background: rgba(255, 255, 255, 0.30) !important;
+    border: 1px solid rgba(255, 255, 255, 0.45) !important;
+}
+
+/* ── 13. EMPTY STATE ── */
+
+.empty-state h3 { color: #111827 !important; }
+.empty-state p  { color: #374151 !important; }
+
+/* ── 14. TRANSPARENT WRAPPERS ── */
+
+.container,
+.hero-section,
+.main-container,
+.content-wrapper,
+.form-section,
+.history-panel,
+.results-section,
+.dashboard-shell,
+.stats-summary,
+.dashboard-grid,
+.premium-dashboard-grid { background: transparent !important; }
+
+
+/* MAIN BACKGROUND */
+
+body:not(.auth-page) {
+
+    background:
+        linear-gradient(
+            to bottom,
+            #ffffff,
+            #f5f7fb
+        ) !important;
+
+    color: #111827 !important;
+}
+
+
+/* =========================================================
+   MAIN GLASS CARDS
+========================================================= */
+
+.extension-card,
+.analysis-card,
+.result-card,
+.history-card,
+.dashboard-card,
+.hero-card,
+.main-card,
+.scan-card {
+
+    background: rgba(255,255,255,0.22) !important;
+
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+
+    border:
+        1px solid rgba(255,255,255,0.55) !important;
+
+    border-radius: 30px !important;
+
+    box-shadow:
+        0 10px 40px rgba(0,0,0,0.06),
+        inset 0 1px 1px rgba(255,255,255,0.45) !important;
+}
+
+
+/* =========================================================
+   CHAT INPUT / SEARCH BOX
+========================================================= */
+
+.chatbox-wrapper,
+.chat-input-container,
+.search-container,
+.home-chatbox {
+
+    background: rgba(255,255,255,0.22) !important;
+
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+
+    border:
+        1px solid rgba(255,255,255,0.5) !important;
+
+    border-radius: 28px !important;
+
+    box-shadow:
+        0 10px 40px rgba(0,0,0,0.06) !important;
+}
+
+
+/* =========================================================
+   TEXTAREA / INPUTS
+========================================================= */
+
+textarea,
+input {
+
+    background:
+        rgba(255,255,255,0.12) !important;
+
+    color: #111827 !important;
+
+    border:
+        1px solid rgba(255,255,255,0.4) !important;
+}
+
+
+/* =========================================================
+   HEADINGS
+========================================================= */
+
+h1, h2, h3, h4 {
+
+    color: #111827 !important;
+}
+
+
+/* =========================================================
+   RESULT SECTIONS
+========================================================= */
+
+.results-container,
+.report-container,
+.analysis-results {
+
+    background: rgba(255,255,255,0.22) !important;
+
+    backdrop-filter: blur(24px) !important;
+
+    border-radius: 30px !important;
+
+    box-shadow:
+        0 10px 40px rgba(0,0,0,0.06) !important;
+}
+
+
+/* =========================================================
+   REMOVE DARK BACKGROUNDS
+========================================================= */
+
+.hero-section,
+.main-container,
+.content-wrapper {
+
+    background: transparent !important;
+}
+
+/* =========================================================
+   GLASSMORPHISM CONSISTENCY FIX — REAL CLASS NAMES
+   Matches login-card glass style exactly.
+   Does NOT touch .login-card or wave particles.
+========================================================= */
+
+/* --- MAIN PAGE: chat/search input box --- */
+
+.home-chatbox,
+.chatbox-input-row {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 28px !important;
+}
+
+.chatbox-textarea {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #111827 !important;
+    border: 1px solid rgba(255, 255, 255, 0.4) !important;
+    border-radius: 16px !important;
+}
+
+
+/* --- MAIN PAGE: extension card --- */
+
+.extension-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 30px !important;
+}
+
+.extension-card .ext-card-title {
+    color: #111827 !important;
+}
+
+.extension-card .ext-card-note {
+    color: #ef4444 !important;
+}
+
+.extension-card .ext-already-installed p {
+    color: #374151 !important;
+}
+
+
+/* --- RESULT CARDS (main page after analysis) --- */
+
+.result-card,
+.analysis-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 30px !important;
+}
+
+.results-section {
+    background: transparent !important;
+}
+
+.result-card h2,
+.result-card h3,
+.analysis-card h3 {
+    color: #111827 !important;
+}
+
+.result-card p,
+.analysis-card p,
+.result-subtitle {
+    color: #374151 !important;
+}
+
+
+/* --- DASHBOARD PAGE --- */
+
+.dashboard-shell {
+    background: transparent !important;
+    padding: 20px !important;
+    max-width: 1200px !important;
+    margin: 0 auto !important;
+}
+
+.dashboard-hero {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 30px !important;
+    padding: 40px 32px !important;
+    margin-bottom: 32px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+}
+
+.dashboard-hero h1,
+.dashboard-hero .eyebrow {
+    color: #111827 !important;
+}
+
+.dashboard-hero .guide {
+    color: #374151 !important;
+}
+
+.dashboard-hero-score {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.dashboard-hero-score span {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    color: #22c55e !important;
+}
+
+.dashboard-hero-score small {
+    font-size: 12px !important;
+    color: #6b7280 !important;
+    text-transform: uppercase !important;
+    margin-top: 4px !important;
+}
+
+.header-copy {
+    flex: 1 !important;
+}
+
+.header-copy .eyebrow {
+    display: block !important;
+    font-size: 12px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: #6b7280 !important;
+    margin-bottom: 12px !important;
+}
+
+.header-copy h1 {
+    font-size: 32px !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    margin: 0 0 12px 0 !important;
+}
+
+.header-copy .guide {
+    font-size: 15px !important;
+    color: #374151 !important;
+    margin: 0 !important;
+}
+
+.stat-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 22px !important;
+    padding: 20px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    text-align: center !important;
+    min-height: 120px !important;
+}
+
+.stat-card .stat-value {
+    color: #111827 !important;
+    font-size: 28px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    margin-bottom: 8px !important;
+}
+
+.stat-card .stat-label {
+    color: #374151 !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+}
+
+.chart-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 30px !important;
+    padding: 24px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.chart-card h3 {
+    color: #111827 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    margin: 0 0 16px 0 !important;
+}
+
+.chart-card canvas {
+    max-height: 280px !important;
+    display: block !important;
+}
+
+.stats-summary {
+    background: transparent !important;
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)) !important;
+    gap: 16px !important;
+    margin: 32px 0 !important;
+}
+
+.dashboard-grid {
+    background: transparent !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 20px !important;
+    margin: 32px 0 !important;
+}
+
+.dashboard-grid .chart-wide {
+    grid-column: 1 / -1 !important;
+}
+
+.dashboard-grid .recent-activity-card {
+    grid-column: 2 / 3 !important;
+    grid-row: 3 / 5 !important;
+}
+
+/* Responsive dashboard grid */
+@media (max-width: 1024px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr !important;
+    }
+    
+    .dashboard-grid .recent-activity-card {
+        grid-column: 1 !important;
+        grid-row: auto !important;
+    }
+}
+
+@media (max-width: 768px) {
+    .dashboard-shell {
+        padding: 12px !important;
+    }
+    
+    .stats-summary {
+        grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)) !important;
+        gap: 12px !important;
+    }
+    
+    .stat-card {
+        min-height: 100px !important;
+        padding: 16px 12px !important;
+    }
+    
+    .stat-card .stat-value {
+        font-size: 24px !important;
+    }
+    
+    .dashboard-hero {
+        flex-direction: column !important;
+        gap: 20px !important;
+        text-align: center !important;
+    }
+    
+    .dashboard-grid {
+        gap: 16px !important;
+    }
+    
+    .chart-card {
+        padding: 16px !important;
+    }
+    
+    .chart-card canvas {
+        max-height: 220px !important;
+    }
+}
+
+.dashboard-actions {
+    background: transparent !important;
+    display: flex !important;
+    justify-content: center !important;
+    gap: 16px !important;
+    margin: 40px 0 20px !important;
+    flex-wrap: wrap !important;
+}
+
+.dashboard-actions .btn-secondary {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    color: #111827 !important;
+    padding: 12px 24px !important;
+    border-radius: 22px !important;
+    font-weight: 500 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+}
+
+.dashboard-actions .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.35) !important;
+    border-color: rgba(255, 255, 255, 0.70) !important;
+}
+
+
+/* --- HISTORY PAGE --- */
+
+.history-panel,
+.form-section {
+    background: transparent !important;
+}
+
+.header-section {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 30px !important;
+}
+
+.header-section h1 {
+    color: #111827 !important;
+}
+
+.header-section .eyebrow,
+.header-section .guide {
+    color: #374151 !important;
+}
+
+.history-item {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 26px !important;
+}
+
+.history-item p,
+.history-description {
+    color: #374151 !important;
+}
+
+.history-item strong {
+    color: #111827 !important;
+}
+
+.history-time {
+    color: #6b7280 !important;
+}
+
+.history-meta span {
+    color: #6b7280 !important;
+}
+
+.history-meta strong {
+    color: #111827 !important;
+}
+
+
+/* --- GUIDE POPUP (main page ? button) --- */
+
+.guide-popup {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+    border-radius: 24px !important;
+}
+
+.guide-header h3 {
+    color: #111827 !important;
+}
+
+.guide-body p {
+    color: #374151 !important;
+}
+
+
+/* --- PROFILE / LOGOUT (dashboard + history) --- */
+
+.profile-wrapper,
+.profile-box {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(24px) !important;
+    -webkit-backdrop-filter: blur(24px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    border-radius: 22px !important;
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.05) !important;
+}
+
+.profile-box .username {
+    color: #111827 !important;
+}
+
+
+/* --- TOP NAV BUTTONS (main page) --- */
+
+.top-actions {
+    background: transparent !important;
+}
+
+.top-btn {
+    background: rgba(255, 255, 255, 0.22) !important;
+    backdrop-filter: blur(20px) !important;
+    -webkit-backdrop-filter: blur(20px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.5) !important;
+    color: #111827 !important;
+}
+
+
+/* --- FEEDBACK CARD --- */
+
+.feedback-card {
+    background: rgba(255, 255, 255, 0.25) !important;
+    backdrop-filter: blur(28px) !important;
+    -webkit-backdrop-filter: blur(28px) !important;
+    border: 1px solid rgba(255, 255, 255, 0.55) !important;
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65) !important;
+}
+
+
+/* --- EMPTY STATE (history) --- */
+
+.empty-state {
+    color: #374151 !important;
+}
+
+.empty-state h3 {
+    color: #111827 !important;
+}
+
+
+/* --- GLOBAL: remove any leftover dark containers --- */
+
+.container {
+    background: transparent !important;
+}
+
+/* =========================================================
+   FLOATING EXPANDABLE MENU � Premium Glassmorphism Design
+   SafeRecruit AI White Futuristic Theme
+========================================================= */
+
+.floating-menu {
+    position: fixed;
+    top: 32px;
+    right: 32px;
+    z-index: 9999;
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+}
+
+/* Floating Trigger Button */
+.floating-trigger {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.65);
+    
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
+    color: #111827;
+    font-size: 28px;
+    font-weight: 700;
+    cursor: pointer;
+    
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 50%;
+    user-select: none;
+}
+
+.floating-trigger:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.70);
+    box-shadow:
+        0 12px 48px rgba(0, 0, 0, 0.10),
+        inset 0 1px 1px rgba(255, 255, 255, 0.75);
+    transform: scale(1.08);
+}
+
+.floating-trigger:active {
+    transform: scale(0.95);
+}
+
+.menu-icon {
+    display: block;
+    width: 24px;
+    height: 24px;
+    transition: transform 0.3s ease;
+    stroke: currentColor;
+}
+
+.floating-trigger.expanded .menu-icon {
+    transform: rotate(90deg);
+}
+
+/* Menu Items Container */
+.floating-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+}
+
+.floating-menu.active .floating-items {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+/* Individual Menu Item */
+.floating-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 18px;
+    
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.06),
+        inset 0 1px 1px rgba(255, 255, 255, 0.60);
+    border-radius: 18px;
+    
+    color: #111827;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    
+    white-space: nowrap;
+    min-width: 160px;
+}
+
+.floating-item:hover {
+    background: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.70);
+    box-shadow:
+        0 12px 40px rgba(0, 0, 0, 0.08),
+        inset 0 1px 1px rgba(255, 255, 255, 0.70);
+    transform: translateX(-4px);
+}
+
+.floating-item:active {
+    transform: translateX(-2px);
+}
+
+/* Logout item styling */
+.floating-item.logout-item {
+    background: rgba(239, 68, 68, 0.12);
+    border-color: rgba(239, 68, 68, 0.25);
+}
+
+.floating-item.logout-item:hover {
+    background: rgba(239, 68, 68, 0.20);
+    border-color: rgba(239, 68, 68, 0.40);
+    color: #dc2626;
+}
+
+/* Item Icon */
+.item-icon {
+    font-size: 18px;
+    display: inline-block;
+    transition: transform 0.3s ease;
+}
+
+.floating-item:hover .item-icon {
+    transform: scale(1.12);
+}
+
+/* Item Text */
+.item-text {
+    display: inline-block;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .floating-menu {
+        top: 20px;
+        right: 20px;
+    }
+    
+    .floating-trigger {
+        width: 56px;
+        height: 56px;
+        font-size: 24px;
+    }
+    
+    .floating-item {
+        min-width: 140px;
+        padding: 10px 16px;
+        font-size: 13px;
+    }
+    
+    .item-icon {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 480px) {
+    .floating-menu {
+        top: 16px;
+        right: 16px;
+    }
+    
+    .floating-trigger {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+    }
+    
+    .floating-item {
+        min-width: 130px;
+        padding: 9px 14px;
+        font-size: 12px;
+        gap: 8px;
+    }
+    
+    .item-icon {
+        font-size: 14px;
+    }
+}
+
+/* Smooth animations for staggered appearance */
+.floating-items .floating-item {
+    animation: slideInItem 0.3s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.floating-items .floating-item:nth-child(1) {
+    animation-delay: 0.05s;
+}
+
+.floating-items .floating-item:nth-child(2) {
+    animation-delay: 0.10s;
+}
+
+.floating-items .floating-item:nth-child(3) {
+    animation-delay: 0.15s;
+}
+
+@keyframes slideInItem {
+    from {
+        opacity: 0;
+        transform: translateX(20px) translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0) translateY(0);
+    }
+}
+
+/* Close overlay when menu is active */
+.floating-menu-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: transparent;
+    cursor: default;
+}
+
+.floating-menu.active ~ .floating-menu-overlay {
+    display: block;
+}

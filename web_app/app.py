@@ -1,36 +1,55 @@
 from flask import Flask, render_template, request, redirect, url_for, session, make_response, send_from_directory
-from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import re
 import json
 import hashlib
 import secrets
 import whois
-from werkzeug.utils import secure_filename
+import sqlite3
 from datetime import datetime
 import requests
-from bs4 import BeautifulSoup
-import functools
 from openai import OpenAI
 from dotenv import load_dotenv
 from collections import Counter
 from datetime import datetime, timedelta
+
+from auth import (
+    User,
+    configure_auth_storage,
+    register_user,
+    user_exists,
+    verify_user,
+)
+from analysis import polish_analysis_result
+from ocr import extract_text_from_image, highlight_keywords_in_image
+from scraping import scrape_url_text
+from utils import (
+    configure_limiter,
+    sanitize_highlighted_text,
+    startup_validation,
+    validate_image_upload,
+)
 
 # Load environment variables from .env (check both project root and web_app folder)
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '.env'))
 
 app = Flask(__name__)
-# Load secret key from environment — never hardcode in production
+# Load secret key from environment â€” never hardcode in production
 app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 app.config['UPLOAD_FOLDER'] = os.path.join(app.root_path, 'uploads')
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 # Use absolute path so it works regardless of where the server is started
 USERS_FILE = os.path.join(app.root_path, 'users.json')
 HISTORY_DIR = os.path.join(app.root_path, 'history')
 FEEDBACK_FILE = os.path.join(app.root_path, 'feedback.json')
+DATABASE_FILE = os.path.join(app.root_path, 'instance', 'database.db')
 os.makedirs(HISTORY_DIR, exist_ok=True)
+os.makedirs(os.path.dirname(DATABASE_FILE), exist_ok=True)
+configure_auth_storage(USERS_FILE)
+startup_validation(app)
 
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
@@ -38,6 +57,7 @@ if not os.path.exists(app.config['UPLOAD_FOLDER']):
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = "login"
+limiter = configure_limiter(app)
 
 # ===== NVIDIA NIM LLM CLIENT =====
 _nvidia_client = None
@@ -78,7 +98,7 @@ def _agent_fast_scan(client, text: str, metadata: dict = None) -> dict:
 def _agent_forensic_analysis(client, text: str, scout_report: dict, metadata: dict = None) -> dict:
     """Agent 2 (Llama-3.1-70B): Optimized version"""
 
-    # 🔥 Reduce input size
+    # ðŸ”¥ Reduce input size
     text = text[:800] if text else ""
 
     user_prompt = _build_user_prompt(text, metadata)
@@ -97,7 +117,7 @@ DO NOT classify as LOW RISK under any condition.
     # Restore full scout report inclusion
     user_prompt += f"\n\n--- SCOUT REPORT (Initial Findings) ---\n{json.dumps(scout_report)}"
 
-    # 🚨 Inject MASTER COMPANY VERIFICATION DATA
+    # ðŸš¨ Inject MASTER COMPANY VERIFICATION DATA
     if metadata and "verification" in metadata:
         v = metadata["verification"]
         user_prompt += f"""
@@ -109,10 +129,10 @@ DO NOT classify as LOW RISK under any condition.
 - Social Media: {v.get('social_presence')}
 
 RULE:
-If company has no online presence (Google/Social/LinkedIn) → increase risk significantly.
+If company has no online presence (Google/Social/LinkedIn) â†’ increase risk significantly.
 """
 
-    # 🚨 Inject VERIFICATION DATA (Scores)
+    # ðŸš¨ Inject VERIFICATION DATA (Scores)
     if metadata:
         user_prompt += f"""
 --- VERIFICATION DATA (Forensic Scores) ---
@@ -140,7 +160,7 @@ Do NOT contradict these signals (e.g., if Recruiter Risk is high, do not mark as
             ],
             temperature=0.1,
             top_p=0.1,
-            max_tokens=600,   # 🔥 reduced
+            max_tokens=600,   # ðŸ”¥ reduced
             stream=True,
         )
 
@@ -166,7 +186,7 @@ Do NOT contradict these signals (e.g., if Recruiter Risk is high, do not mark as
 
 
 # ===== LLM ANALYSIS CACHE =====
-# Caches results by MD5 hash of input text — avoids repeat API calls, saves credits
+# Caches results by MD5 hash of input text â€” avoids repeat API calls, saves credits
 _ANALYSIS_CACHE: dict = {}
 _ANALYSIS_CACHE_MAX = 50
 
@@ -219,6 +239,203 @@ def save_history(username: str, entries: list):
     except Exception as e:
         print(f'[History] Failed to save: {e}')
 
+def _db_connect():
+    conn = sqlite3.connect(DATABASE_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_scan_db():
+    with _db_connect() as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username VARCHAR(100) UNIQUE,
+                password VARCHAR(100)
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                input_text TEXT,
+                prediction VARCHAR(20),
+                risk INTEGER
+            )
+        """)
+        existing = {row["name"] for row in conn.execute("PRAGMA table_info(history)").fetchall()}
+        for column, definition in {
+            "confidence": "INTEGER DEFAULT 0",
+            "category": "TEXT DEFAULT ''",
+            "engine": "TEXT DEFAULT ''",
+            "source": "TEXT DEFAULT 'text'",
+            "created_at": "TEXT",
+        }.items():
+            if column not in existing:
+                conn.execute(f"ALTER TABLE history ADD COLUMN {column} {definition}")
+        conn.commit()
+
+def _db_user_id(username: str):
+    with _db_connect() as conn:
+        row = conn.execute("SELECT id FROM user WHERE lower(username) = lower(?)", (username,)).fetchone()
+        if row:
+            return row["id"]
+        cur = conn.execute("INSERT INTO user (username, password) VALUES (?, ?)", (username, "flask-login-json-user"))
+        conn.commit()
+        return cur.lastrowid
+
+def save_scan_to_db(username: str, entry: dict):
+    try:
+        init_scan_db()
+        user_id = _db_user_id(username)
+        with _db_connect() as conn:
+            conn.execute("""
+                INSERT INTO history
+                    (user_id, input_text, prediction, risk, confidence, category, engine, source, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                user_id,
+                entry.get("input_text", ""),
+                entry.get("prediction", "UNKNOWN"),
+                int(entry.get("risk") or 0),
+                int(entry.get("confidence") or 0),
+                entry.get("category", ""),
+                entry.get("engine", ""),
+                entry.get("source", "text"),
+                entry.get("timestamp") or datetime.now().strftime("%Y-%m-%d %H:%M"),
+            ))
+            conn.commit()
+    except Exception as e:
+        print(f"[SQLite History] Failed to save scan: {e}")
+
+def migrate_json_history_to_db(username: str):
+    """Backfill legacy JSON history into SQLite so dashboard analytics use real scans."""
+    try:
+        init_scan_db()
+        user_id = _db_user_id(username)
+        for item in load_history(username):
+            timestamp = item.get("timestamp") or ""
+            input_text = item.get("input_text", "")
+            if not input_text or not timestamp:
+                continue
+            source = item.get("source")
+            if not source:
+                lowered = input_text.lower()
+                source = "url" if lowered.startswith("protected platform url:") or "http" in lowered else "text"
+            with _db_connect() as conn:
+                exists = conn.execute("""
+                    SELECT 1 FROM history
+                    WHERE user_id = ? AND input_text = ? AND COALESCE(created_at, '') = ?
+                    LIMIT 1
+                """, (user_id, input_text, timestamp)).fetchone()
+                if exists:
+                    continue
+                conn.execute("""
+                    INSERT INTO history
+                        (user_id, input_text, prediction, risk, confidence, category, engine, source, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    user_id,
+                    input_text,
+                    item.get("prediction", "UNKNOWN"),
+                    int(item.get("risk") or 0),
+                    int(item.get("confidence") or 0),
+                    item.get("category", ""),
+                    item.get("engine", ""),
+                    source,
+                    timestamp,
+                ))
+                conn.commit()
+    except Exception as e:
+        print(f"[SQLite History] Legacy migration skipped: {e}")
+
+def load_dashboard_stats(username: str) -> dict:
+    init_scan_db()
+    migrate_json_history_to_db(username)
+    user_id = _db_user_id(username)
+    with _db_connect() as conn:
+        rows = conn.execute("""
+            SELECT
+                prediction,
+                COALESCE(risk, 0) AS risk,
+                COALESCE(confidence, 0) AS confidence,
+                COALESCE(category, '') AS category,
+                COALESCE(engine, '') AS engine,
+                COALESCE(source, 'text') AS source,
+                COALESCE(created_at, '') AS created_at,
+                COALESCE(input_text, '') AS input_text
+            FROM history
+            WHERE user_id = ?
+            ORDER BY datetime(created_at) DESC, id DESC
+        """, (user_id,)).fetchall()
+
+        scans_this_week = conn.execute("""
+            SELECT COUNT(*) AS count
+            FROM history
+            WHERE user_id = ?
+              AND date(COALESCE(created_at, 'now')) >= date('now', '-6 days')
+        """, (user_id,)).fetchone()["count"]
+
+        recent_detections = conn.execute("""
+            SELECT COUNT(*) AS count
+            FROM history
+            WHERE user_id = ?
+              AND upper(COALESCE(prediction, '')) IN ('FAKE', 'SUSPICIOUS')
+              AND date(COALESCE(created_at, 'now')) >= date('now', '-6 days')
+        """, (user_id,)).fetchone()["count"]
+
+    total_scans = len(rows)
+    predictions = [str(row["prediction"] or "UNKNOWN").upper() for row in rows]
+    risks = [int(row["risk"] or 0) for row in rows]
+    confidences = [int(row["confidence"] or 0) for row in rows if int(row["confidence"] or 0) > 0]
+    dates = [(row["created_at"] or "").split(" ")[0] for row in rows if row["created_at"]]
+    categories = [row["category"] or "Uncategorized" for row in rows]
+    sources = [row["source"] or "text" for row in rows]
+
+    risk_bands = {
+        "Low (0-39)": sum(1 for r in risks if r < 40),
+        "Medium (40-69)": sum(1 for r in risks if 40 <= r < 70),
+        "High (70-100)": sum(1 for r in risks if r >= 70),
+    }
+    timeline_counts = Counter(dates)
+    sorted_dates = sorted(timeline_counts.keys())[-14:]
+    timeline_data = {date: timeline_counts[date] for date in sorted_dates}
+    avg_risk_by_day = {
+        date: round(sum(int(row["risk"] or 0) for row in rows if (row["created_at"] or "").startswith(date)) /
+                    max(sum(1 for row in rows if (row["created_at"] or "").startswith(date)), 1), 1)
+        for date in sorted_dates
+    }
+
+    return {
+        "total_scans": total_scans,
+        "safe_jobs": predictions.count("REAL"),
+        "suspicious_jobs": predictions.count("SUSPICIOUS"),
+        "fake_jobs": predictions.count("FAKE"),
+        "avg_risk": round(sum(risks) / max(total_scans, 1), 1),
+        "avg_confidence": round(sum(confidences) / max(len(confidences), 1), 1),
+        "ocr_scans": sources.count("ocr"),
+        "url_scans": sources.count("url") + sources.count("linkedin"),
+        "scans_this_week": scans_this_week,
+        "recent_detections": recent_detections,
+        "risk_counts": dict(Counter(predictions)),
+        "risk_bands": risk_bands,
+        "category_counts": dict(Counter(categories).most_common(6)),
+        "engine_counts": dict(Counter(row["engine"] or "Unknown" for row in rows)),
+        "timeline_data": timeline_data,
+        "avg_risk_by_day": avg_risk_by_day,
+        "recent_activity": [
+            {
+                "prediction": row["prediction"],
+                "risk": row["risk"],
+                "source": row["source"],
+                "created_at": row["created_at"],
+                "input_text": (row["input_text"] or "")[:90],
+            }
+            for row in rows[:5]
+        ],
+    }
+
+init_scan_db()
+
 # ===== FEEDBACK & LEARNING HELPERS =====
 def load_feedback() -> list:
     if os.path.exists(FEEDBACK_FILE):
@@ -257,91 +474,15 @@ def get_feedback_few_shots() -> str:
         fs_text += f"Input: \"{ex['text']}...\" -> Correction: {ex['correction']} (Reason: {ex['notes']})\n"
     return fs_text
 
-# ===== USER MANAGEMENT FUNCTIONS =====
-_USER_CACHE = None
-
-def load_users():
-    """Load users from JSON file with in-memory caching."""
-    global _USER_CACHE
-    if _USER_CACHE is not None:
-        return _USER_CACHE
-
-    if os.path.exists(USERS_FILE):
-        try:
-            with open(USERS_FILE, 'r') as f:
-                _USER_CACHE = json.load(f)
-                return _USER_CACHE
-        except:
-            pass
-    _USER_CACHE = {}
-    return _USER_CACHE
-
-def save_users(users):
-    """Save users to JSON file and update cache."""
-    global _USER_CACHE
-    _USER_CACHE = users
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
-
-def user_exists(username):
-    """Check if user exists."""
-    users = load_users()
-    return username in users
-
-def register_user(username, password):
-    """Register a new user with hashed password."""
-    if user_exists(username):
-        return False
-    users = load_users()
-    users[username] = generate_password_hash(password)
-    save_users(users)
-    return True
-
-def verify_user(username, password):
-    """Verify username and password."""
-    users = load_users()
-    if username not in users:
-        return False
-    return check_password_hash(users[username], password)
-
-class User(UserMixin):
-    def __init__(self, id):
-        self.id = id
-        self.username = id
-
 @login_manager.user_loader
 def load_user(user_id):
     if user_exists(user_id):
         return User(user_id)
     return None
 
-@functools.lru_cache(maxsize=128)
-def scrape_url_text(url):
-    """Scrape and extract text from a URL, with caching to improve performance."""
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-    response = requests.get(url, headers=headers, timeout=10)
-    response.raise_for_status()
-    soup = BeautifulSoup(response.text, 'html.parser')
-    
-    # Remove script and style elements
-    for script in soup(["script", "style", "nav", "footer", "header"]):
-        script.extract()
-        
-    # Get text
-    text = soup.get_text(separator=' ')
-    
-    # Check for Bot Protection / Security Challenges (Common on LinkedIn/Indeed)
-    block_phrases = ["security check", "captcha", "bot detection", "please sign in", "log in to view", "access denied", "verify you are human"]
-    if any(phrase in text.lower() for phrase in block_phrases):
-        raise ValueError("The website blocked our scanner (Security Check). Please paste the job description text manually for a more accurate analysis.")
-
-    lines = (line.strip() for line in text.splitlines())
-    chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-    return '\n'.join(chunk for chunk in chunks if chunk)
-
 
 # =============================================================================
-# GUARDRAIL PIPELINE — 5 Layers
+# GUARDRAIL PIPELINE â€” 5 Layers
 # =============================================================================
 
 # --- KNOWN INVALID PATTERNS (no API call ever made for these) ----------------
@@ -363,11 +504,11 @@ _JOB_KEYWORDS = {
 }
 
 
-# ── LAYER 1: Input Validator ──────────────────────────────────────────────────
+# â”€â”€ LAYER 1: Input Validator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _validate_input(text: str) -> tuple[bool, str]:
     """
     Returns (is_valid, rejection_reason).
-    Runs entirely in-process — zero API calls.
+    Runs entirely in-process â€” zero API calls.
     """
     if not text or not text.strip():
         return False, "empty"
@@ -391,7 +532,7 @@ def _validate_input(text: str) -> tuple[bool, str]:
     return True, "ok"
 
 
-# ── LAYER 2: Task Classifier ──────────────────────────────────────────────────
+# â”€â”€ LAYER 2: Task Classifier â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def _classify_task(text: str) -> str:
     """
     Classify input without any API call.
@@ -412,7 +553,7 @@ def _research_url_forensics(text: str) -> str:
     import urllib.parse
     findings = []
 
-    # ── URL research ──
+    # â”€â”€ URL research â”€â”€
     urls = re.findall(r'(https?://[^\s<>"]+)', text)
     high_risk_tlds = {
         '.xyz', '.top', '.site', '.work', '.icu', '.vip',
@@ -433,22 +574,22 @@ def _research_url_forensics(text: str) -> str:
             note = f"URL-DOMAIN: {domain}"
             # High-risk TLD
             if any(domain.endswith(tld) for tld in high_risk_tlds):
-                note += " → 🚨 HIGH-RISK TLD (phishing indicator)"
+                note += " â†’ ðŸš¨ HIGH-RISK TLD (phishing indicator)"
             # Brand spoofing
             for brand in major_brands:
                 if brand in domain and domain not in (f"{brand}.com", f"www.{brand}.com") \
                         and not domain.endswith(f".{brand}.com"):
-                    note += f" → ⚠️ POTENTIAL {brand.upper()} DOMAIN SPOOF"
+                    note += f" â†’ âš ï¸ POTENTIAL {brand.upper()} DOMAIN SPOOF"
             # LinkedIn check
             if 'linkedin' in domain and 'linkedin.com' not in domain:
-                note += " → 🚨 FAKE LINKEDIN DOMAIN"
+                note += " â†’ ðŸš¨ FAKE LINKEDIN DOMAIN"
             elif 'linkedin.com' in domain and '/jobs' not in url and '/in/' not in url:
-                note += " → ⚠️ LinkedIn link but not a job posting — possible DM redirect"
+                note += " â†’ âš ï¸ LinkedIn link but not a job posting â€” possible DM redirect"
             findings.append(note)
         except:
             continue
 
-    # ── Email research ──
+    # â”€â”€ Email research â”€â”€
     emails = re.findall(r'[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}', text)
     generic_providers = {
         'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com',
@@ -458,10 +599,10 @@ def _research_url_forensics(text: str) -> str:
         domain = email.split('@')[-1].lower()
         note = f"EMAIL: {email}"
         if domain in generic_providers:
-            note += " → ⚠️ Generic provider (legitimate companies use corporate email)"
+            note += " â†’ âš ï¸ Generic provider (legitimate companies use corporate email)"
         for brand in major_brands:
             if brand in domain and domain not in (f"{brand}.com",):
-                note += f" → 🚨 POTENTIAL {brand.upper()} EMAIL SPOOF"
+                note += f" â†’ ðŸš¨ POTENTIAL {brand.upper()} EMAIL SPOOF"
         findings.append(note)
 
     if not findings:
@@ -711,7 +852,8 @@ def analyze_recruiter_behavior(text):
 def build_final_verdict(text, verification):
     """Combine trust scoring and behavioral analysis into a final verdict."""
     trust_score = calculate_trust_score(verification, text)
-    recruiter_risk, detected_patterns, signals = analyze_recruiter_behavior(text)
+    recruiter_risk, signals = analyze_recruiter_behavior(text)
+    detected_patterns = [k for k, v in signals.items() if v]
     
     # Adjust trust score based on behavioral risk
     final_trust = max(0, trust_score - recruiter_risk)
@@ -720,13 +862,13 @@ def build_final_verdict(text, verification):
 
     if final_trust < 30:
         prediction = "FAKE"
-        category = "🚨 High Risk (Verified Scam Pattern)"
+        category = "ðŸš¨ High Risk (Verified Scam Pattern)"
     elif final_trust <= 60:
         prediction = "SUSPICIOUS"
-        category = "⚠️ Medium Risk (Suspicious Behavior)"
+        category = "âš ï¸ Medium Risk (Suspicious Behavior)"
     else:
         prediction = "REAL"
-        category = "✅ Low Risk (Verified Employer)"
+        category = "âœ… Low Risk (Verified Employer)"
 
     # Generate a why_risky explanation based on signals
     why_risky_parts = []
@@ -772,7 +914,7 @@ def linkedin_like_verification(text):
     return score
 
 
-# ── LAYER 3: Strict LLM Prompt ────────────────────────────────────────────────
+# â”€â”€ LAYER 3: Strict LLM Prompt â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _FEW_SHOT_EXAMPLES = """--- FORENSIC EXAMPLES ---
 Example 1 (High Risk):
 Input: "Urgent hiring! No interview needed. Contact on Telegram @job_offer. Payment $50 for background check."
@@ -780,7 +922,7 @@ Output: {
   "prediction": "Fake",
   "confidence": "100%",
   "risk": 95,
-  "category": "🚨 High Risk (Task Scam & Fee Fraud)",
+  "category": "ðŸš¨ High Risk (Task Scam & Fee Fraud)",
   "reasons": ["Detected known scam pattern: Upfront payment request", "Detected known scam pattern: Off-platform contact (Telegram)", "Detected known scam pattern: Artificial urgency"],
   "why_risky": "This posting exhibits multiple high-confidence indicators of a 'Task Scam'. The request for an upfront fee for a background check is a classic financial fraud tactic, as legitimate employers cover these costs. Use of Telegram bypasses corporate communication standards to avoid traceability.",
   "final_advice": "DO NOT send money or share personal data. Block the contact immediately.",
@@ -793,7 +935,7 @@ Output: {
   "prediction": "Real",
   "confidence": "95%",
   "risk": 10,
-  "category": "✅ Low Risk (Verified Corporate)",
+  "category": "âœ… Low Risk (Verified Corporate)",
   "reasons": ["Official career portal detected", "Standard professional requirements", "No social engineering triggers found"],
   "why_risky": "The posting links to an official, verified corporate domain and follows standard recruitment protocols without any pressure tactics or financial red flags.",
   "final_advice": "Safe to proceed through the official link provided.",
@@ -851,7 +993,7 @@ def _build_user_prompt(text: str, metadata: dict = None) -> str:
     # NEW: Perform URL/Domain Research
     research_data = _research_url_forensics(text)
     
-    prompt = f"Mode: {mode.upper()} — {depth}\n"
+    prompt = f"Mode: {mode.upper()} â€” {depth}\n"
     if research_data:
         prompt += f"{research_data}\n"
     
@@ -869,7 +1011,7 @@ def _build_user_prompt(text: str, metadata: dict = None) -> str:
     return prompt
 
 
-# ── LAYER 4: Output Validator ─────────────────────────────────────────────────
+# â”€â”€ LAYER 4: Output Validator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 _REQUIRED_KEYS = {
     "prediction", "confidence", "risk", "category",
     "fraud_risk_score", "financial_trap_index", "credibility_score",
@@ -941,16 +1083,16 @@ def _fill_defaults(result: dict) -> dict:
     prediction = result["prediction"].upper()
     if prediction == "FAKE":
         result["verdict"] = "FAKE"
-        result["category"] = "🚨 High Risk"
+        result["category"] = "ðŸš¨ High Risk"
         result["risk"] = max(score, 75)
         result["optimized_resume"] = None # Never optimize for fake jobs
     elif prediction == "SUSPICIOUS":
         result["verdict"] = "SUSPICIOUS"
-        result["category"] = "⚠️ Medium Risk"
+        result["category"] = "âš ï¸ Medium Risk"
         result["risk"] = max(score, 40)
     else:
         result["verdict"] = "REAL"
-        result["category"] = "✅ Low Risk"
+        result["category"] = "âœ… Low Risk"
         result["risk"] = min(score, 25)
 
     # Handle nested analysis
@@ -967,14 +1109,14 @@ def _fill_defaults(result: dict) -> dict:
     result.setdefault("consistency_check", "pass")
     result.setdefault("final_reasoning", "Strict forensic analysis applied.")
     result.setdefault("suggestions", [
-        "✓ Do not proceed until company identity is verified.",
-        "✓ Check if this job exists on official LinkedIn pages.",
+        "âœ“ Do not proceed until company identity is verified.",
+        "âœ“ Check if this job exists on official LinkedIn pages.",
     ])
     
     return result
 
 
-# ── LAYER 5: Multi-Agent Collaborative Call ──
+# â”€â”€ LAYER 5: Multi-Agent Collaborative Call â”€â”€
 def _call_llm(client, text: str, metadata: dict = None, retries: int = 1) -> dict | None:
     for attempt in range(retries + 1):
         try:
@@ -989,7 +1131,7 @@ def _call_llm(client, text: str, metadata: dict = None, retries: int = 1) -> dic
             if scout_report.get("initial_risk", 50) < 70:
                 final_result = _agent_forensic_analysis(client, text, scout_report, metadata)
             else:
-                # 🔥 Skip 70B (high risk already clear)
+                # ðŸ”¥ Skip 70B (high risk already clear)
                 print("[Pipeline] Short-circuiting to 8B decision (High Risk detected).")
                 final_result = {
                     "prediction": "FAKE",
@@ -1012,7 +1154,7 @@ def _call_llm(client, text: str, metadata: dict = None, retries: int = 1) -> dic
                 if scout_report.get("initial_risk", 0) > 80 and final_result.get("fraud_risk_score", 0) < 50:
                     final_result["fraud_risk_score"] = max(final_result.get("fraud_risk_score", 0), 60)
                     if "reasons" in final_result:
-                        final_result["reasons"].append("🚨 Discrepancy Alert: Scout Agent detected high immediate risk.")
+                        final_result["reasons"].append("ðŸš¨ Discrepancy Alert: Scout Agent detected high immediate risk.")
                 
                 # Standardize Metrics
                 for metric in ["fraud_risk_score", "financial_trap_index", "credibility_score", "urgency_pressure_score", "information_quality_score", "confidence", "match_score"]:
@@ -1043,7 +1185,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
       L5: Token Optimiser - max_tokens=1500, text capped at 1500 chars
     """
 
-    # ── L1: Validate input ----------------------------------------------------
+    # â”€â”€ L1: Validate input ----------------------------------------------------
     is_valid, rejection_reason = _validate_input(text)
     if not is_valid:
         reason_map = {
@@ -1056,15 +1198,15 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
         return {
             "prediction": "INVALID",
             "confidence": 0, "risk": 0,
-            "category": "❌ Invalid Input",
+            "category": "âŒ Invalid Input",
             "fraud_risk_score": 0, "financial_trap_index": 0,
             "credibility_score": 0, "urgency_pressure_score": 0,
             "information_quality_score": 0,
             "reasons": [reason_map.get(rejection_reason, "Invalid input.")],
             "suggestions": [
-                "✓ Paste the full text of the job posting.",
-                "✓ Or enter the job URL to have it scraped automatically.",
-                "✓ Or upload a screenshot of the job ad.",
+                "âœ“ Paste the full text of the job posting.",
+                "âœ“ Or enter the job URL to have it scraped automatically.",
+                "âœ“ Or upload a screenshot of the job ad.",
             ],
             "engine": "Validator",
         }
@@ -1084,23 +1226,23 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     print(f"\n[DEBUG] Original Text (first 100 chars): {text[:100]}")
     print(f"[DEBUG] Normalized Text (first 100 chars): {text_clean[:100]}")
 
-    # ── Instant Kill Rule (High Certainty Scams) ──
+    # â”€â”€ Instant Kill Rule (High Certainty Scams) â”€â”€
     text_lower = text.lower()
     
-    # ── MANDATORY PRE-LLM GUARDRAIL (HARD ENFORCEMENT) ──
+    # â”€â”€ MANDATORY PRE-LLM GUARDRAIL (HARD ENFORCEMENT) â”€â”€
     if "paymentunverified" in text_clean or "0spent" in text_clean or "paymentunveritied" in text_clean:
         print("[Guardrail] Instant Kill: Platform Trust Failure detected in Normalized Text.")
         
         # Default to SUSPICIOUS
         prediction = "SUSPICIOUS"
-        category = "⚠️ Medium Risk (Platform Trust Failure)"
+        category = "âš ï¸ Medium Risk (Platform Trust Failure)"
         risk_score = 75
         confidence = 85
         
-        # 🔥 CRITICAL: Double Failure = FAKE
+        # ðŸ”¥ CRITICAL: Double Failure = FAKE
         if ("paymentunverified" in text_clean or "paymentunveritied" in text_clean) and "0spent" in text_clean:
             prediction = "FAKE"
-            category = "🚨 High Risk (Verified Scam Pattern)"
+            category = "ðŸš¨ High Risk (Verified Scam Pattern)"
             risk_score = 90
             confidence = 95
 
@@ -1128,21 +1270,21 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
             "engine": "Pre-Guardrail"
         }
 
-    # ── COMPANY VERIFICATION GUARDRAIL (FULL FORENSICS) ──
+    # â”€â”€ COMPANY VERIFICATION GUARDRAIL (FULL FORENSICS) â”€â”€
     verification = verify_company_full(text)
     
-    # 🚨 FAKE DOMAIN (WHOIS INVALID)
+    # ðŸš¨ FAKE DOMAIN (WHOIS INVALID)
     if verification["whois_status"] == "invalid":
         print(f"[Guardrail] WHOIS Check Failed: {verification['whois_status']}")
         return {
             "prediction": "FAKE",
             "confidence": 95,
             "risk": 90,
-            "category": "🚨 Fake Domain",
+            "category": "ðŸš¨ Fake Domain",
             "fraud_risk_score": 90,
             "financial_trap_index": 85,
             "credibility_score": 5,
-            "reasons": ["🚨 High-risk signal: The domain does not have a valid WHOIS registration or is invalid."],
+            "reasons": ["ðŸš¨ High-risk signal: The domain does not have a valid WHOIS registration or is invalid."],
             "suggestions": ["Avoid applying immediately. This domain appears to be spoofed or a burner site."],
             "engine": "WHOIS-Guardrail"
         }
@@ -1182,14 +1324,14 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
         # Requirement 3: Increase credibility_score by +20 (max 100)
         metadata["credibility_boost"] = 20
 
-    # 🚨 NO SOCIAL SIGNAL
+    # ðŸš¨ NO SOCIAL SIGNAL
     if verification["social_presence"] == "none":
-        print("⚠️ No social media presence detected in job text.")
+        print("âš ï¸ No social media presence detected in job text.")
 
     if verification["linkedin_status"] == "missing":
-        print("⚠️ No LinkedIn company profile found in job text.")
+        print("âš ï¸ No LinkedIn company profile found in job text.")
 
-    # ── CALCULATE FINAL TRUST METRICS ──
+    # â”€â”€ CALCULATE FINAL TRUST METRICS â”€â”€
     final_verdict_data = build_final_verdict(text, verification)
 
     if "whatsapp" in text_lower and ("payment" in text_lower or "money" in text_lower or "registration" in text_lower):
@@ -1198,9 +1340,9 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
             "prediction": "FAKE",
             "confidence": 100,
             "fraud_risk_score": 100,
-            "reasons": ["🚨 High-certainty scam pattern: Found off-platform contact (WhatsApp) combined with financial requests."],
+            "reasons": ["ðŸš¨ High-certainty scam pattern: Found off-platform contact (WhatsApp) combined with financial requests."],
             "verdict": "FAKE",
-            "category": "🚨 Critical Risk",
+            "category": "ðŸš¨ Critical Risk",
             "risk": 100,
             "engine": "Static-Guardrail",
             "final_advice": "CRITICAL: This is a verified scam pattern. Do not share any data.",
@@ -1208,7 +1350,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
             "optimized_resume": None
         }
 
-    # ── Platform Metadata Risk Boost ──
+    # â”€â”€ Platform Metadata Risk Boost â”€â”€
     risk_boost = 0
     if "payment unverified" in text_lower: risk_boost += 30
     if "$0 spent" in text_lower: risk_boost += 25
@@ -1228,29 +1370,29 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     if risk_boost > 0:
         print(f"[Guardrail] Risk Boost applied: +{risk_boost} based on platform metadata.")
 
-    # ── L2: Classify task ─────────────────────────────────────────────────────
+    # â”€â”€ L2: Classify task â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     task_class = _classify_task(text)
     if task_class == "invalid":
         print(f"[L2-Classifier] Rejected: not a job posting")
         return {
             "prediction": "INVALID",
             "confidence": 0, "risk": 0,
-            "category": "❌ Not a Job Posting",
+            "category": "âŒ Not a Job Posting",
             "fraud_risk_score": 0, "financial_trap_index": 0,
             "credibility_score": 0, "urgency_pressure_score": 0,
             "information_quality_score": 0,
             "reasons": [
-                "⚠️ This text does not appear to be a job posting.",
-                "⚠️ No job-related keywords were found (e.g., hiring, salary, position, role).",
+                "âš ï¸ This text does not appear to be a job posting.",
+                "âš ï¸ No job-related keywords were found (e.g., hiring, salary, position, role).",
             ],
             "suggestions": [
-                "✓ Paste a real job advertisement to get an analysis.",
-                "✓ Include details like role, salary, company, and requirements.",
+                "âœ“ Paste a real job advertisement to get an analysis.",
+                "âœ“ Include details like role, salary, company, and requirements.",
             ],
             "engine": "Classifier",
         }
 
-    # ── L3 + L4 + L5: LLM call with strict prompt + output validation ─────────
+    # â”€â”€ L3 + L4 + L5: LLM call with strict prompt + output validation â”€â”€â”€â”€â”€â”€â”€â”€â”€
     client = get_nvidia_client()
     if client:
         # Pass verification data inside metadata
@@ -1259,7 +1401,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
         
         llm_result = _call_llm(client, text, metadata)
         if llm_result:
-            # ── Post-LLM Hard Guardrail ──
+            # â”€â”€ Post-LLM Hard Guardrail â”€â”€
             # If LLM says REAL but text has massive red flags, downgrade to SUSPICIOUS
             prediction = llm_result.get("prediction", "SUSPICIOUS").upper()
             text_lower = text.lower()
@@ -1268,11 +1410,11 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
                 print(f"[Guardrail] Downgrading REAL to SUSPICIOUS due to red flags in text.")
                 llm_result["prediction"] = "SUSPICIOUS"
                 llm_result["verdict"] = "SUSPICIOUS"
-                llm_result["category"] = "⚠️ Medium Risk (Flagged by Guardrail)"
+                llm_result["category"] = "âš ï¸ Medium Risk (Flagged by Guardrail)"
                 llm_result["risk"] = max(llm_result.get("risk", 0), 45)
-                llm_result["reasons"].append("⚠️ Automatic Guardrail: Found high-risk phrases in a 'Real' prediction.")
+                llm_result["reasons"].append("âš ï¸ Automatic Guardrail: Found high-risk phrases in a 'Real' prediction.")
             
-            # ── HARD PLATFORM ENFORCEMENT (CRITICAL FIX) ──
+            # â”€â”€ HARD PLATFORM ENFORCEMENT (CRITICAL FIX) â”€â”€
             text_lower = text.lower()
             if "payment unverified" in text_lower or "$0 spent" in text_lower:
                 print("[CRITICAL GUARDRAIL] Enforcing HIGH RISK due to platform signals")
@@ -1280,20 +1422,20 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
                 # Default to SUSPICIOUS for single failure
                 llm_result["prediction"] = "SUSPICIOUS"
                 llm_result["verdict"] = "SUSPICIOUS"
-                llm_result["category"] = "⚠️ Medium Risk (Platform Trust Failure)"
+                llm_result["category"] = "âš ï¸ Medium Risk (Platform Trust Failure)"
                 llm_result["fraud_risk_score"] = max(llm_result.get("fraud_risk_score", 50), 70)
 
-                # 🔥 CRITICAL: Double Failure = FAKE
+                # ðŸ”¥ CRITICAL: Double Failure = FAKE
                 if ("payment unverified" in text_lower and "$0 spent" in text_lower) or \
                    ("paymentunverified" in text_clean and "0spent" in text_clean):
                     llm_result["prediction"] = "FAKE"
-                    llm_result["category"] = "🚨 High Risk (Verified Scam Pattern)"
+                    llm_result["category"] = "ðŸš¨ High Risk (Verified Scam Pattern)"
                     llm_result["fraud_risk_score"] = 85
 
                 llm_result["risk"] = llm_result["fraud_risk_score"]
 
                 # Add reason if missing
-                reason_text = "⚠️ Platform Risk: Payment unverified / $0 spent detected"
+                reason_text = "âš ï¸ Platform Risk: Payment unverified / $0 spent detected"
                 if "reasons" in llm_result:
                     llm_result["reasons"].append(reason_text)
                 else:
@@ -1306,9 +1448,9 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
                 _set_cache(text, llm_result)
                 
             return llm_result
-        print("[Pipeline] LLM returned None — falling back to rule-based.")
+        print("[Pipeline] LLM returned None â€” falling back to rule-based.")
 
-    # ── Fallback: rule-based ──────────────────────────────────────────────────
+    # â”€â”€ Fallback: rule-based â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     result = _rule_based_analyze(text)
     result["engine"] = "Rule-based"
     
@@ -1316,7 +1458,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     if len(text) < 500:
         _set_cache(text, result)
 
-    # ── Apply Google-based Enhancements to Final Result ──
+    # â”€â”€ Apply Google-based Enhancements to Final Result â”€â”€
     final_result = llm_result if llm_result else result
     
     # Apply Reasons and Suggestions
@@ -1338,7 +1480,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
         # Downgrade REAL to SUSPICIOUS if company not found
         if final_result.get("prediction") == "REAL" and verification.get("company_name"):
             final_result["prediction"] = "SUSPICIOUS"
-            final_result["category"] = "⚠️ Medium Risk (Unverified Company)"
+            final_result["category"] = "âš ï¸ Medium Risk (Unverified Company)"
             
         final_result.setdefault("reasons", []).append("Company could not be verified online despite normal job description")
             
@@ -1353,7 +1495,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     if domain_age == "new":
         final_result["fraud_risk_score"] = min(final_result.get("fraud_risk_score", 50) + 25, 100)
         final_result["risk"] = final_result["fraud_risk_score"]
-        final_result.setdefault("reasons", []).append("⚠️ New domain detected (possible scam)")
+        final_result.setdefault("reasons", []).append("âš ï¸ New domain detected (possible scam)")
         final_result["urgency_pressure_score"] = min(final_result.get("urgency_pressure_score", 30) + 10, 100)
         
     elif domain_age == "medium":
@@ -1366,10 +1508,10 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     # === Stronger Multi-Signal Logic (Requirement 6) ===
     if domain_age == "new" and google_status == "not_found":
         final_result["prediction"] = "FAKE"
-        final_result["category"] = "🚨 High Risk (Verified Scam Pattern)"
+        final_result["category"] = "ðŸš¨ High Risk (Verified Scam Pattern)"
         final_result["fraud_risk_score"] = max(final_result.get("fraud_risk_score", 0), 92)
         final_result["risk"] = final_result["fraud_risk_score"]
-        final_result.setdefault("reasons", []).append("🚨 Critical signal: New domain + no Google presence (high scam probability)")
+        final_result.setdefault("reasons", []).append("ðŸš¨ Critical signal: New domain + no Google presence (high scam probability)")
 
     final_result["trust_score"] = metadata.get("trust_score", 50)
     final_result["domain_age"] = metadata.get("domain_age", "unknown")
@@ -1393,7 +1535,7 @@ def analyze_job_description(text: str, metadata: dict = None) -> dict:
     return final_result
 
 
-# ── Rule-based analyser (fallback only) ──────────────────────────────────────
+# â”€â”€ Rule-based analyser (fallback only) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 def analyze_job_with_llm(text: str) -> dict:
     """Alias kept for backward compatibility."""
     return analyze_job_description(text)
@@ -1404,7 +1546,7 @@ def _rule_based_analyze(text: str) -> dict:
     if not text or len(text.strip()) < 10:
         return {
             "prediction": "INVALID", "confidence": 0, "risk": 0,
-            "category": "❌ Invalid Input",
+            "category": "âŒ Invalid Input",
             "fraud_risk_score": 0, "financial_trap_index": 0,
             "credibility_score": 0, "urgency_pressure_score": 0,
             "information_quality_score": 0,
@@ -1413,7 +1555,8 @@ def _rule_based_analyze(text: str) -> dict:
             "engine": "Rule-based",
         }
 
-    risk_boost, detected_patterns, signals = analyze_recruiter_behavior(text)
+    risk_boost, signals = analyze_recruiter_behavior(text)
+    detected_patterns = [k for k, v in signals.items() if v]
     
     # Calculate base risk from length and content
     base_risk = 30
@@ -1425,13 +1568,13 @@ def _rule_based_analyze(text: str) -> dict:
     
     if final_risk > 65:
         prediction = "FAKE"
-        category = "🚨 High Risk"
+        category = "ðŸš¨ High Risk"
     elif final_risk > 40:
         prediction = "SUSPICIOUS"
-        category = "⚠️ Medium Risk"
+        category = "âš ï¸ Medium Risk"
     else:
         prediction = "REAL"
-        category = "✅ Low Risk"
+        category = "âœ… Low Risk"
 
     return {
         "prediction": prediction, 
@@ -1439,125 +1582,14 @@ def _rule_based_analyze(text: str) -> dict:
         "risk": final_risk, 
         "category": category,
         "fraud_risk_score": final_risk,
-        "reasons": reasons if reasons else ["✓ No obvious fraud patterns detected."],
+        "reasons": reasons if reasons else ["âœ“ No obvious fraud patterns detected."],
         "suggestions": [
-            "✓ Verify company information independently.",
-            "✓ Check official company website and LinkedIn.",
-            "✓ Be cautious of requests for upfront payments.",
+            "âœ“ Verify company information independently.",
+            "âœ“ Check official company website and LinkedIn.",
+            "âœ“ Be cautious of requests for upfront payments.",
         ],
         "engine": "Rule-based",
     }
-
-def extract_text_from_image(image_path):
-    """Extract text from image using OCR."""
-    try:
-        from PIL import Image
-        import pytesseract
-
-        # Validate file exists
-        if not os.path.exists(image_path):
-            return None
-
-        # Open and validate image
-        img = Image.open(image_path)
-
-        # Check image size (limit to 50MB to prevent processing large files)
-        file_size = os.path.getsize(image_path)
-        if file_size > 50 * 1024 * 1024:
-            return None
-
-        # Extract text
-        extracted_text = pytesseract.image_to_string(img)
-
-        # Validate extraction result
-        if extracted_text and len(extracted_text.strip()) > 5:
-            return extracted_text.strip()
-
-        return None
-    except ImportError:
-        return None
-    except Exception as e:
-        return None
-
-def normalize_ocr_text(text):
-    """Normalize OCR words so punctuation does not block keyword matching."""
-    return re.sub(r"[^a-z0-9]+", "", text.lower())
-
-def highlight_keywords_in_image(image_path, keywords, output_path):
-    """Draw red highlights on keywords found in the image."""
-    try:
-        from PIL import Image, ImageDraw
-        import pytesseract
-
-        if not os.path.exists(image_path):
-            return False
-
-        img = Image.open(image_path).convert('RGBA')
-
-        # Get detailed OCR data with bounding boxes
-        data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
-
-        words = []
-        for i, raw_word in enumerate(data['text']):
-            normalized_word = normalize_ocr_text(raw_word)
-            if not normalized_word:
-                continue
-
-            words.append({
-                "text": normalized_word,
-                "left": data['left'][i],
-                "top": data['top'][i],
-                "width": data['width'][i],
-                "height": data['height'][i],
-            })
-
-        highlight_boxes = []
-        keyword_tokens = [
-            [normalize_ocr_text(token) for token in keyword.split() if normalize_ocr_text(token)]
-            for keyword in keywords
-        ]
-
-        for start_index in range(len(words)):
-            for tokens in keyword_tokens:
-                if not tokens or start_index + len(tokens) > len(words):
-                    continue
-
-                candidate = words[start_index:start_index + len(tokens)]
-                is_match = all(
-                    token == word["text"] or token in word["text"] or word["text"] in token
-                    for token, word in zip(tokens, candidate)
-                )
-
-                if is_match:
-                    highlight_boxes.extend(candidate)
-
-        overlay = Image.new('RGBA', img.size, (0, 0, 0, 0))
-        overlay_draw = ImageDraw.Draw(overlay)
-
-        for box in highlight_boxes:
-            padding = 4
-            x1 = max(0, box["left"] - padding)
-            y1 = max(0, box["top"] - padding)
-            x2 = min(img.width, box["left"] + box["width"] + padding)
-            y2 = min(img.height, box["top"] + box["height"] + padding)
-            overlay_draw.rectangle([x1, y1, x2, y2], fill=(217, 64, 53, 78))
-
-        img = Image.alpha_composite(img, overlay).convert('RGB')
-        draw = ImageDraw.Draw(img)
-
-        for box in highlight_boxes:
-            padding = 4
-            x1 = max(0, box["left"] - padding)
-            y1 = max(0, box["top"] - padding)
-            x2 = min(img.width, box["left"] + box["width"] + padding)
-            y2 = min(img.height, box["top"] + box["height"] + padding)
-            draw.rectangle([x1, y1, x2, y2], outline=(217, 64, 53), width=3)
-
-        img.save(output_path)
-        return bool(highlight_boxes)
-
-    except Exception as e:
-        return False
 
 def is_valid_job_text(text):
     text_lower = text.lower()
@@ -1595,8 +1627,12 @@ def home():
     job_input = None  # Ensure job_input is initialized for the template
 
     if request.method == "POST":
-        print("FILES:", request.files)  # Debugging: Show all uploaded files
+        print("="*60)
+        print("[POST] Form submitted")
+        print(f"[POST] FILES: {request.files}")
+        print(f"[POST] FORM KEYS: {list(request.form.keys())}")
         job_input = request.form.get("job_input", "").strip()
+        print(f"[POST] job_input length: {len(job_input)}")
         
         # Optional Metadata
         metadata = {
@@ -1606,19 +1642,30 @@ def home():
         }
 
         job_image = request.files.get("job_image")
+        scan_source = "text"
+        print(f"[POST] job_image: {job_image}")
+        print(f"[POST] job_image.filename: {job_image.filename if job_image else 'None'}")
 
         if job_image and job_image.filename:
             try:
-                filename = secure_filename(job_image.filename)
+                filename, upload_error = validate_image_upload(job_image)
+                if upload_error:
+                    raise ValueError(upload_error)
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                print(f"[IMAGE] Saving to: {filepath}")
                 job_image.save(filepath)
+                print(f"[IMAGE] Saved successfully. File size: {os.path.getsize(filepath)} bytes")
                 
                 # Provide the original image to be displayed in the results unconditionally
                 processed_image_url = url_for("uploaded_file", filename=filename)
                 
+                print("[IMAGE] Starting OCR extraction...")
                 extracted = extract_text_from_image(filepath)
+                print(f"[IMAGE] OCR result: {'SUCCESS - ' + str(len(extracted)) + ' chars' if extracted else 'FAILED (None)'}")
                 if extracted:
                     job_input = extracted
+                    scan_source = "ocr"
+                    print(f"[IMAGE] Using extracted text as job_input ({len(job_input)} chars)")
 
                     # Highlight keywords in the screenshot image
                     keywords_to_highlight = [
@@ -1635,10 +1682,16 @@ def home():
                         if os.path.exists(processed_path):
                             processed_image_url = url_for("uploaded_file", filename=processed_filename)
                 else:
+                    print("[IMAGE] OCR returned no text")
                     if not job_input: # Only show error if no text was provided at all
                         error = "Could not extract text from image. Please paste text instead."
+                        print(f"[IMAGE] Setting error: {error}")
+            except ValueError as e:
+                error = str(e)
+                print(f"[IMAGE] VALIDATION ERROR: {error}")
             except Exception as e:
                 error = f"Error processing image: {str(e)}"
+                print(f"[IMAGE] EXCEPTION: {error}")
 
         is_protected_url = False
         if job_input:
@@ -1652,7 +1705,7 @@ def home():
                         "prediction": "SUSPICIOUS",
                         "confidence": 60,
                         "risk": 30,
-                        "category": "⚠️ Limited Analysis (Protected Platform)",
+                        "category": "âš ï¸ Limited Analysis (Protected Platform)",
                         "fraud_risk_score": 30,
                         "reasons": [
                             "This platform blocks automated scraping",
@@ -1673,22 +1726,26 @@ def home():
                                 print("[LinkedIn] Valid job content extracted")
                                 job_input = text
                                 metadata["source"] = "linkedin"
+                                scan_source = "linkedin"
                             else:
                                 raise Exception("Invalid LinkedIn content")
                         except Exception as e:
                             is_protected_url = True
                             scraped_url = job_input
                             job_input = "Protected Platform URL: " + job_input
+                            scan_source = "linkedin"
                             result = fallback_result
                     else:
                         is_protected_url = True
                         scraped_url = job_input
                         job_input = "Protected Platform URL: " + job_input
+                        scan_source = "url"
                         result = fallback_result
                 else:
                     try:
                         scraped_url = job_input
                         job_input = scrape_url_text(job_input)
+                        scan_source = "url"
                     except Exception as e:
                         error = str(e)
                         job_input = None # Stop analysis if scraping failed (e.g. LinkedIn Security Check)
@@ -1703,9 +1760,10 @@ def home():
                     result = cached
                 else:
                     result = analyze_job_description(job_input, metadata)
-                    # Only cache valid analyses — never cache INVALID or URL-based responses
+                    # Only cache valid analyses â€” never cache INVALID or URL-based responses
                     if result.get("prediction") != "INVALID" and not scraped_url:
                         _set_cache(job_input, result)
+                result = polish_analysis_result(result)
 
             prediction  = result.get("prediction")
             confidence  = result.get("confidence", 50)
@@ -1715,7 +1773,7 @@ def home():
             suggestions = result.get("suggestions", [])
             engine      = result.get("engine", "LLM" if get_nvidia_client() else "Rule-based")
 
-            # ── Guardrail: show INVALID as a user-facing error, not a result page ──
+            # â”€â”€ Guardrail: show INVALID as a user-facing error, not a result page â”€â”€
             if prediction == "INVALID":
                 error = reasons[0] if reasons else "That doesn't look like a job posting. Please paste a real job description."
                 prediction = None   # prevents the results block from rendering
@@ -1727,7 +1785,6 @@ def home():
                 urgency_pressure_score    = result.get("urgency_pressure_score")
                 information_quality_score = result.get("information_quality_score")
 
-                highlighted_text = job_input
                 keywords_to_highlight = [
                     "upfront", "bitcoin", "western union", "wire transfer", "gift card",
                     "urgent", "immediate", "immediate start", "no interview", "no experience",
@@ -1736,23 +1793,20 @@ def home():
                     "whatsapp", "telegram", "cash app", "venmo", "paypal", "crypto",
                     "security deposit", "starter kit", "equipment fee", "reshipping"
                 ]
-                for kw in keywords_to_highlight:
-                    if kw.lower() in job_input.lower():
-                        pattern = re.compile(re.escape(kw), re.IGNORECASE)
-                        highlighted_text = pattern.sub(
-                            f'<mark style="background-color:#e74c3c; color:white; padding:2px 4px; border-radius:3px; font-weight:bold;">\\g<0></mark>',
-                            highlighted_text
-                        )
+                highlighted_text = sanitize_highlighted_text(job_input, keywords_to_highlight)
 
-                # Persist history — only for valid FAKE/SUSPICIOUS/REAL results
+                # Persist history â€” only for valid FAKE/SUSPICIOUS/REAL results
                 history = load_history(current_user.username)
-                history.insert(0, {
+                history_entry = {
                     "input_text": job_input[:120] + ("..." if len(job_input) > 120 else ""),
                     "prediction": prediction, "confidence": confidence,
                     "risk": risk, "category": category, "engine": engine,
+                    "source": scan_source,
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M")
-                })
+                }
+                history.insert(0, history_entry)
                 save_history(current_user.username, history)
+                save_scan_to_db(current_user.username, history_entry)
         elif request.method == "POST" and not error:
             error = "Please enter a job description or upload an image"
 
@@ -1778,7 +1832,10 @@ def home():
         # Multi-Agent Visibility
         scout_summary=result.get('scout_summary'),
         initial_risk=result.get('initial_risk'),
-        final_advice=result.get('final_advice', '')
+        final_advice=result.get('final_advice', ''),
+        validation_gates_passed=result.get('validation_gates_passed'),
+        failed_gates=result.get('failed_gates', []),
+        trust_score=result.get('trust_score', 50)
     )
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1855,7 +1912,7 @@ def signup():
 
     return render_template("signup.html", error=error, success=success)
 
-# ✅ BUG FIX: redirect to /login (not /home which needs auth)
+# âœ… BUG FIX: redirect to /login (not /home which needs auth)
 @app.route("/logout")
 @login_required
 def logout():
@@ -1875,47 +1932,14 @@ def history():
 @app.route("/dashboard")
 @login_required
 def dashboard():
-    """Aggregated forensics statistics for the user."""
-    history = load_history(current_user.username)
-    
-    # ── 1. General Stats ──
-    total_scans = len(history)
-    
-    # ── 2. Risk Distribution ──
-    predictions = [item.get('prediction', 'UNKNOWN') for item in history]
-    risk_counts = Counter(predictions)
-    
-    # ── 3. Engine Distribution ──
-    engines = [item.get('engine', 'LLM') for item in history]
-    engine_counts = Counter(engines)
-    
-    # ── 4. Average Confidence & Risk ──
-    avg_confidence = sum(item.get('confidence', 0) for item in history) / max(total_scans, 1)
-    avg_risk = sum(item.get('risk', 0) for item in history) / max(total_scans, 1)
-    
-    # ── 5. Activity Timeline (Last 7 Days) ──
-    # Format: {"2024-04-20": 5, ...}
-    dates = [item.get('timestamp', '').split(' ')[0] for item in history if item.get('timestamp')]
-    timeline_counts = Counter(dates)
-    
-    # Sort timeline for Chart.js
-    sorted_dates = sorted(timeline_counts.keys())[-7:]
-    timeline_data = {date: timeline_counts[date] for date in sorted_dates}
-
-    stats = {
-        "total_scans": total_scans,
-        "risk_counts": dict(risk_counts),
-        "engine_counts": dict(engine_counts),
-        "avg_confidence": round(avg_confidence, 1),
-        "avg_risk": round(avg_risk, 1),
-        "timeline_data": timeline_data
-    }
-    
+    """Aggregated forensics statistics from SQLite scan history."""
+    stats = load_dashboard_stats(current_user.username)
     return render_template("dashboard.html", stats=stats)
 
 
 # ===== CHROME EXTENSION API ENDPOINT =====
 @app.route("/api/analyze", methods=["POST"])
+@limiter.limit("20 per minute")
 def api_analyze():
     """API endpoint for the Chrome extension to submit job text for analysis."""
     from flask import jsonify
@@ -1929,7 +1953,7 @@ def api_analyze():
 
         metadata = {"source": "linkedin_extension"}
 
-        result = analyze_job_description(text, metadata=metadata)
+        result = polish_analysis_result(analyze_job_description(text, metadata=metadata))
         
         # Override engine for clarity
         result["engine"] = "Extension + AI Pipeline"
@@ -1941,12 +1965,25 @@ def api_analyze():
         return jsonify({"error": "Analysis failed", "details": str(e)}), 500
 
 
+# ===== NEXT.JS FRONTEND JSON API ENDPOINTS =====
+
+@app.route("/api/history", methods=["GET"])
+@login_required
+def api_history():
+    """Return current user's scan history as JSON for the Next.js frontend."""
+    from flask import jsonify
+    data = load_history(current_user.username)
+    return jsonify(data)
+
+
+@app.route("/api/stats", methods=["GET"])
+@login_required
+def api_stats():
+    """Return aggregated stats as JSON from SQLite scan history."""
+    from flask import jsonify
+    return jsonify(load_dashboard_stats(current_user.username))
+
+
+
 if __name__ == "__main__":
-    app.run(debug=True)
-
-@app.route("/test-google")
-def test_google():
-    company = "Google"
-    result = google_search_company(company)
-    return f"Google search result: {result}"
-
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1")

@@ -4,11 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>History - SafeRecruit AI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=200">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 
-<body class="history-page">
-    <canvas id="particleCanvas" aria-hidden="true"></canvas>
+<body class="history-page ai-theme">
+    <canvas id="waveCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
         <button type="button" class="profile-box" onclick="location.href='/logout'">

@@ -2,56 +2,49 @@
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SafeRecruit AI - Fake Job Detection</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=100">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=201">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Space+Grotesk:wght@700;800&family=Outfit:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-        .profile-wrapper {
-            position: absolute !important;
-            top: 24px !important;
-            right: 24px !important;
-            z-index: 100000 !important;
-            pointer-events: auto !important;
-        }
-        #particleCanvas {
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
-            height: 100% !important;
-            z-index: -1 !important;
-            pointer-events: none !important;
-        }
-    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 </head>
 
-<body class="main-page {% if not prediction %}home-view{% endif %}">
-    <canvas id="particleCanvas" aria-hidden="true"></canvas>
+<body class="main-page ai-theme {% if not prediction %}home-view{% endif %}">
 
-    <div class="profile-wrapper">
-        {% if current_user.is_authenticated %}
-        <button type="button" class="profile-box" onclick="toggleMenu(this)" aria-haspopup="true" aria-expanded="false"
-            aria-controls="profileMenu">
-            <span class="avatar">{{ current_user.username[0]|upper }}</span>
-            <span class="profile-info">
-                <span class="username">{{ current_user.username }}</span>
-                <span class="status">Active session</span>
-            </span>
+    <!-- Floating Expandable Menu -->
+    <div class="floating-menu" id="floatingMenu">
+        <button class="floating-trigger" id="floatingTrigger" aria-label="Menu">
+            <svg class="menu-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="3" y1="6" x2="21" y2="6"></line>
+                <line x1="3" y1="12" x2="21" y2="12"></line>
+                <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
         </button>
-        <div id="profileMenu" class="profile-menu" role="menu">
-            <a href="{{ url_for('history') }}" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128202;</span>History</a>
-            <a href="{{ url_for('logout') }}" role="menuitem"><span class="menu-icon" aria-hidden="true">&#128682;</span>Logout</a>
-        </div>
-        {% else %}
-        <a href="/login" class="login-btn">Login</a>
-        {% endif %}
+        <nav class="floating-items">
+            <a href="{{ url_for('dashboard') }}" class="floating-item" data-label="Dashboard">
+                <span class="item-icon">📊</span>
+                <span class="item-text">Dashboard</span>
+            </a>
+            <a href="{{ url_for('history') }}" class="floating-item" data-label="History">
+                <span class="item-icon">📋</span>
+                <span class="item-text">History</span>
+            </a>
+            <a href="{{ url_for('logout') }}" class="floating-item logout-item" data-label="Logout">
+                <span class="item-icon">🚪</span>
+                <span class="item-text">Logout</span>
+            </a>
+        </nav>
     </div>
+
+    <canvas id="waveCanvas" aria-hidden="true"></canvas>
+
+
 
     <main class="container">
     {% if not prediction %}
     <!-- RESTORED OLD UI - EXACTLY AS SCREENSHOT -->
-    <div class="hero-logo">SAFERECRUIT AI</div>
+    <h1 class="hero-logo animate-shiny-text" style="color: #111827 !important; text-align: center; margin-bottom: 30px;">SafeRecruit AI</h1>
 
     <div class="extension-card">
         <div class="ext-card-header" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
@@ -74,7 +67,13 @@
         </div>
     </div>
 
-    <form method="POST" id="jobForm" enctype="multipart/form-data" class="home-chatbox">
+    {% if error %}
+    <div class="error-box" style="position: fixed; bottom: 110px; left: 50%; transform: translateX(-50%); width: min(780px, 88%); z-index: 1001; text-align: center; padding: 14px 20px; border-radius: 16px; font-weight: 600; animation: fadeUp 0.5s ease;">
+        ⚠️ {{ error }}
+    </div>
+    {% endif %}
+
+    <form method="POST" action="/" id="jobForm" enctype="multipart/form-data" class="home-chatbox">
         <!-- Image thumbnail preview area -->
         <div id="imagePreview" class="img-preview-row" style="display: none; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1);">
             <div style="position: relative; display: inline-block;">
@@ -86,16 +85,20 @@
 
         <div class="chatbox-input-row">
             <input type="file" name="job_image" id="jobImageInput" accept="image/*" hidden>
+
             <button type="button" class="chatbox-icon-btn" onclick="document.getElementById('jobImageInput').click()">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                     <circle cx="8.5" cy="8.5" r="1.5"></circle>
                     <polyline points="21 15 16 10 5 21"></polyline>
                 </svg>
             </button>
+
             <textarea id="jobInput" name="job_input" class="chatbox-textarea" rows="1"
                 placeholder="Paste a job URL or job description here..."
                 oninput="autoResize(this)">{{ original_text }}</textarea>
+
             <button type="submit" id="analyzeBtn" class="chatbox-send-btn">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
@@ -235,7 +238,7 @@
             {% if highlighted_text %}
             <div class="analysis-card">
                 <h3><span class="section-icon" aria-hidden="true">&#128196;</span>Job Description</h3>
-                <div class="text-preview">{{ highlighted_text|safe }}</div>
+                <div class="text-preview">{{ highlighted_text }}</div>
             </div>
             {% endif %}
 
@@ -472,7 +475,7 @@
         }
     </script>
 
-    <script src="{{ url_for('static', filename='script.js') }}?v=6"></script>
+    <script src="{{ url_for('static', filename='script.js') }}?v=200"></script>
     <script>
         function toggleGuide() {
             const popup = document.getElementById('guidePopup');
@@ -564,19 +567,8 @@
             }
         }
 
-        // Form submit: show overlay + loading state
-        var form = document.getElementById('jobForm');
-        if (form) {
-            form.addEventListener('submit', function () {
-                var overlay = document.getElementById('loader');
-                if (overlay) overlay.style.display = 'flex';
-                var btn = document.getElementById('analyzeBtn');
-                if (btn) {
-                    btn.classList.add('analyzing');
-                    btn.disabled = true;
-                }
-            });
-        }
+        // Form submit debug — actual loading is handled by script.js
+        console.log('[SafeRecruit] Inline JS loaded. Form submit handler is in script.js.');
 
         function autoResize(el) {
             el.style.height = '';
@@ -717,7 +709,16 @@ Verified by SafeRecruit AI Forensic Engine
                     }
                 });
         }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const promptTextarea = document.getElementById("jobInput");
+            if (promptTextarea && typeof window.autoResize === "function") {
+                window.autoResize(promptTextarea);
+            }
+        });
     </script>
+
+    <script src="{{ url_for('static', filename='floating_menu.js') }}?v=100"></script>
 </body>
 
 </html>

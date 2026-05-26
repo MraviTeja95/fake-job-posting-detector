@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body class="auth-page">
-    <canvas id="particleCanvas" aria-hidden="true"></canvas>
+    <canvas id="waveCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
     </div>
@@ -15,6 +15,7 @@
     <main class="login-wrapper">
         <section class="login-card" aria-labelledby="signup-title">
             <h1 class="login-title" id="signup-title">SafeRecruit AI</h1>
+            <p class="login-subtitle">Forensic Job Fraud Detection Engine</p>
 
             {% if error %}
             <div class="error-box" role="alert">&#9888;&#65039; {{ error }}</div>
@@ -30,7 +31,7 @@
                         type="text"
                         id="username"
                         name="username"
-                        placeholder="Enter your username (3+ characters)"
+                        placeholder="Username (3+ characters)"
                         autocomplete="username"
                         autofocus
                         required
@@ -42,7 +43,7 @@
                         type="password"
                         id="password"
                         name="password"
-                        placeholder="Enter password (6+ characters)"
+                        placeholder="Password (6+ characters)"
                         autocomplete="new-password"
                         required
                     >
@@ -53,7 +54,7 @@
                         type="password"
                         id="confirm_password"
                         name="confirm_password"
-                        placeholder="Confirm your password"
+                        placeholder="Confirm password"
                         autocomplete="new-password"
                         required
                     >
@@ -73,6 +74,8 @@
         </section>
     </main>
 
+    <!-- Load Three.js from CDN before running script.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

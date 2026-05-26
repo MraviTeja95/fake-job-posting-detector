@@ -1,5 +1,8 @@
 document.addEventListener("DOMContentLoaded", function () {
     console.log("[SafeRecruit] UI Restored to Stable Mode.");
+    if (typeof initWaveBackground === "function") {
+        initWaveBackground();
+    }
 
     const form = document.getElementById("jobForm");
     const loader = document.getElementById("loader");
@@ -23,24 +26,33 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 
-    // Form Submit Logic
+    // Form Submit Logic — DOES NOT block form submission (no preventDefault)
     if (form) {
         form.addEventListener("submit", function () {
+            console.log("[SafeRecruit] Form submitting...");
+            console.log("[SafeRecruit] Has text:", textarea ? textarea.value.trim().length > 0 : false);
+
+            var fileInput = document.getElementById("jobImageInput");
+            console.log("[SafeRecruit] Has image:", fileInput && fileInput.files.length > 0);
+            if (fileInput && fileInput.files.length > 0) {
+                console.log("[SafeRecruit] Image name:", fileInput.files[0].name);
+                console.log("[SafeRecruit] Image size:", fileInput.files[0].size, "bytes");
+            }
+
+            // Show loader overlay
             if (loader) {
                 loader.style.display = "flex";
                 loader.style.opacity = "1";
-                
-                const inputWrapper = document.querySelector(".chatbox-fixed-bottom");
-                if (inputWrapper) {
-                    inputWrapper.style.opacity = "0.2";
-                    inputWrapper.style.pointerEvents = "none";
-                }
             }
+            // Disable button to prevent double-submit
             if (button) {
                 button.disabled = true;
                 button.classList.remove("pulse");
+                button.classList.add("is-loading");
+                button.setAttribute("aria-busy", "true");
             }
 
+            // Cycle status messages
             if (loaderText) {
                 const messages = [
                     "Analyzing job content...",
@@ -62,6 +74,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 cycleMessages();
                 window._loaderInterval = setInterval(cycleMessages, 3000);
             }
+
+            // DO NOT return false or call preventDefault — let the form submit normally
         });
     }
 
@@ -76,6 +90,15 @@ document.addEventListener("DOMContentLoaded", function () {
         jobImageInput.addEventListener("change", function () {
             const file = this.files[0];
             if (file) {
+                const allowed = ["image/png", "image/jpeg", "image/webp"];
+                if (!allowed.includes(file.type) || file.size > 8 * 1024 * 1024) {
+                    alert("Please upload a PNG, JPG, JPEG, or WEBP screenshot under 8 MB.");
+                    this.value = "";
+                    imagePreview.style.display = "none";
+                    if (imgThumb) imgThumb.src = "";
+                    if (imgName) imgName.textContent = "";
+                    return;
+                }
                 const reader = new FileReader();
                 reader.onload = function (e) {
                     if (imgThumb) imgThumb.src = e.target.result;
@@ -119,18 +142,15 @@ window.autoResize = function(el) {
     }
 };
 
-// Particles logic kept for visual flair
-const canvas = document.getElementById("particleCanvas");
-if (canvas) {
-    // ... (rest of particle logic stays as is if needed, but I'll assume it's fine)
-}
 
 document.querySelectorAll("form").forEach((pageForm) => {
     if (pageForm.id === "jobForm") return;
 
     pageForm.addEventListener("submit", function () {
         const submitButton = pageForm.querySelector("button[type='submit']");
-        setButtonLoading(submitButton);
+        if (typeof setButtonLoading === "function") {
+            setButtonLoading(submitButton);
+        }
     });
 });
 
@@ -178,127 +198,148 @@ window.addEventListener("load", () => {
     });
 });
 
-const canvas = document.getElementById("particleCanvas");
-const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// ===== 3D Three.js Dotted Wave Background =====
+// Renders a premium, interactive animated wave of particles in the background.
+// Customizations:
+// - Grid dimensions (density): Change AMOUNTX / AMOUNTY
+// - Wave height / speed: Adjust count step (0.025) and wave multiplier (60)
+// - Colors: Configured via CSS variables or falls back to custom themes
+window.initWaveBackground = function() {
+    const canvas = document.getElementById("waveCanvas");
+    if (!canvas) return;
 
-if (canvas && !reduceMotion) {
-    const ctx = canvas.getContext("2d");
-    let mouseX = window.innerWidth / 2;
-    let mouseY = window.innerHeight / 2;
-    let particles = [];
+    console.log("Wave background initialized");
 
-    class Particle {
-        constructor() {
-            this.reset(true);
-        }
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) return;
 
-        reset(randomizePosition) {
-            this.x = randomizePosition ? Math.random() * window.innerWidth : window.innerWidth / 2;
-            this.y = randomizePosition ? Math.random() * window.innerHeight : window.innerHeight / 2;
-            this.vx = (Math.random() - 0.5) * 0.45;
-            this.vy = (Math.random() - 0.5) * 0.45;
-            this.size = 1.2 + Math.random() * 1.5;
-            this.alpha = 0.18 + Math.random() * 0.22;
-        }
+    function startAnimation() {
+        const THREE = window.THREE;
+        if (!THREE) return;
 
-        move() {
-            this.x += this.vx;
-            this.y += this.vy;
+        const SEPARATION = 140;
+        const AMOUNTX = 45; 
+        const AMOUNTY = 45;
 
-            if (this.x < -20) this.x = window.innerWidth + 20;
-            if (this.x > window.innerWidth + 20) this.x = -20;
-            if (this.y < -20) this.y = window.innerHeight + 20;
-            if (this.y > window.innerHeight + 20) this.y = -20;
-        }
+        let scene, camera, renderer, particles, geometry, material;
+        let count = 0;
+        let animationId;
 
-        draw(pColor, pGlow) {
-            const dx = this.x - mouseX;
-            const dy = this.y - mouseY;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            const lift = dist < 150 ? (1 - dist / 150) * 0.35 : 0;
+        // Initialize Scene — light premium white theme
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xffffff);
+        scene.fog = new THREE.Fog(0xffffff, 2000, 10000);
 
-            ctx.beginPath();
-            ctx.arc(this.x, this.y, this.size + lift, 0, Math.PI * 2);
+        // Camera positioning & angle
+        camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 1, 10000);
+        camera.position.set(0, 420, 1150);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
 
-            ctx.fillStyle = `rgba(${pColor}, ${this.alpha + lift})`;
-            ctx.shadowBlur = pGlow;
-            if (pGlow > 0) ctx.shadowColor = `rgba(${pColor}, 0.6)`;
+        // Setup Renderer
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            powerPreference: "high-performance"
+        });
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0xffffff, 1);
 
-            ctx.fill();
-            ctx.shadowBlur = 0;
-        }
-    }
+        // Build Particle Grid Arrays
+        const numParticles = AMOUNTX * AMOUNTY;
+        const positions = new Float32Array(numParticles * 3);
+        const colors = new Float32Array(numParticles * 3);
 
-    function resizeCanvas() {
-        const ratio = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(window.innerWidth * ratio);
-        canvas.height = Math.floor(window.innerHeight * ratio);
-        canvas.style.width = `${window.innerWidth}px`;
-        canvas.style.height = `${window.innerHeight}px`;
-        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        // Fetch colors dynamically from CSS variables
+        const styles = getComputedStyle(document.documentElement);
+        const particleColorVar = styles.getPropertyValue("--particle-color").trim() || "209, 213, 219";
+        const rgb = particleColorVar.split(",").map(val => parseInt(val.trim()) / 255);
 
-        const particleCount = Math.max(48, Math.min(110, Math.floor(window.innerWidth * window.innerHeight / 16000)));
-        particles = Array.from({ length: particleCount }, () => new Particle());
-    }
+        let i = 0;
+        for (let ix = 0; ix < AMOUNTX; ix++) {
+            for (let iy = 0; iy < AMOUNTY; iy++) {
+                const x = ix * SEPARATION - (AMOUNTX * SEPARATION) / 2;
+                const z = iy * SEPARATION - (AMOUNTY * SEPARATION) / 2;
 
-    function connectParticles(pColor, pGlow) {
-        for (let i = 0; i < particles.length; i++) {
-            for (let j = i + 1; j < particles.length; j++) {
-                const dx = particles[i].x - particles[j].x;
-                const dy = particles[i].y - particles[j].y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+                positions[i * 3] = x;
+                positions[i * 3 + 1] = 0;
+                positions[i * 3 + 2] = z;
 
-                if (dist < 118) {
-                    ctx.beginPath();
-                    ctx.strokeStyle = `rgba(${pColor}, ${(1 - dist / 118) * 0.15})`;
-                    ctx.lineWidth = 1;
+                colors[i * 3]     = rgb[0] !== undefined ? rgb[0] : 0.82;
+                colors[i * 3 + 1] = rgb[1] !== undefined ? rgb[1] : 0.83;
+                colors[i * 3 + 2] = rgb[2] !== undefined ? rgb[2] : 0.86;
 
-                    if (pGlow > 0) {
-                        ctx.shadowBlur = pGlow / 2;
-                        ctx.shadowColor = `rgba(${pColor}, 0.4)`;
-                    } else {
-                        ctx.shadowBlur = 0;
-                    }
-
-                    ctx.moveTo(particles[i].x, particles[i].y);
-                    ctx.lineTo(particles[j].x, particles[j].y);
-                    ctx.stroke();
-                }
+                i++;
             }
         }
-    }
 
-    let cachedPColor = '23, 23, 23';
-    let cachedPGlow = 0;
-    let frameCount = 0;
+        geometry = new THREE.BufferGeometry();
+        geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
 
-    function animate() {
-        if (frameCount % 30 === 0) {
-            const styles = getComputedStyle(document.documentElement);
-            cachedPColor = styles.getPropertyValue('--particle-color').trim() || '23, 23, 23';
-            cachedPGlow = parseInt(styles.getPropertyValue('--particle-glow').trim() || '0');
-        }
-        frameCount++;
-
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
-        particles.forEach((particle) => {
-            particle.move();
-            particle.draw(cachedPColor, cachedPGlow);
+        // Create Particle Material
+        material = new THREE.PointsMaterial({
+            color: 0x000000,
+            size: 7,
+            transparent: true,
+            opacity: 0.45,
+            sizeAttenuation: true
         });
-        connectParticles(cachedPColor, cachedPGlow);
-        requestAnimationFrame(animate);
+
+        particles = new THREE.Points(geometry, material);
+        scene.add(particles);
+
+        // Render & Wave Update Loop
+        function animate() {
+            animationId = requestAnimationFrame(animate);
+
+            const positionAttribute = geometry.attributes.position;
+            const posArray = positionAttribute.array;
+
+            let index = 0;
+            for (let ix = 0; ix < AMOUNTX; ix++) {
+                for (let iy = 0; iy < AMOUNTY; iy++) {
+                    posArray[index * 3 + 1] = 
+                        Math.sin((ix + count) * 0.25) * 60 +
+                        Math.sin((iy + count) * 0.4) * 60;
+                    index++;
+                }
+            }
+
+            positionAttribute.needsUpdate = true;
+            renderer.render(scene, camera);
+            count += 0.025; // Speed multiplier
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener("resize", onWindowResize, { passive: true });
+        animate();
+
+        // Memory cleanup
+        window.addEventListener("beforeunload", () => {
+            cancelAnimationFrame(animationId);
+            window.removeEventListener("resize", onWindowResize);
+            if (geometry) geometry.dispose();
+            if (material) material.dispose();
+            if (renderer) renderer.dispose();
+        });
     }
 
-    // Faster hover response
-    document.addEventListener("mousemove", (event) => {
-        mouseX = event.clientX;
-        mouseY = event.clientY;
-    }, { passive: true });
-
-    window.addEventListener("resize", resizeCanvas, { passive: true });
-    resizeCanvas();
-    animate();
-}
+    // Load Three.js dynamically if not already loaded by static script
+    if (window.THREE) {
+        startAnimation();
+    } else {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js";
+        script.onload = startAnimation;
+        script.onerror = () => console.error("Three.js failed to load.");
+        document.head.appendChild(script);
+    }
+};
 
 document.addEventListener("DOMContentLoaded", () => {
     // History Filter Logic

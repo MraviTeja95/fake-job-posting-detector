@@ -2,9 +2,14 @@ pandas
 scikit-learn
 flask
 flask-login
+Flask-Limiter
 joblib
 requests
 beautifulsoup4
 openai
 python-dotenv
 python-whois
+easyocr
+numpy
+pillow
+pytesseract

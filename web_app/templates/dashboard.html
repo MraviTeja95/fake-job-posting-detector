@@ -4,200 +4,194 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Intelligence Dashboard - SafeRecruit AI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=210">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Space+Grotesk:wght@700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
-            width: 100%;
-            margin-top: 32px;
-        }
-        .stats-summary {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            width: 100%;
-        }
-        .stat-card {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            padding: 24px;
-            border-radius: var(--radius);
-            text-align: center;
-        }
-        .stat-value {
-            display: block;
-            font-size: 2.4rem;
-            font-weight: 700;
-            color: var(--accent);
-            margin-bottom: 4px;
-        }
-        .stat-label {
-            font-size: 0.85rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--ink-soft);
-            font-weight: 600;
-        }
-        .chart-card {
-            background: var(--surface);
-            border: 1px solid var(--line);
-            padding: 24px;
-            border-radius: var(--radius);
-            min-height: 350px;
-            display: flex;
-            flex-direction: column;
-        }
-        .chart-card h3 {
-            margin: 0 0 20px;
-            font-size: 1.1rem;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        canvas {
-            max-width: 100%;
-            flex-grow: 1;
-        }
-    </style>
 </head>
-<body class="history-page">
-    <canvas id="particleCanvas" aria-hidden="true"></canvas>
+<body class="history-page ai-theme dashboard-page">
+    <canvas id="waveCanvas" aria-hidden="true"></canvas>
 
     <div class="profile-wrapper">
         <button type="button" class="profile-box" onclick="location.href='/logout'">
             <span class="avatar">{{ current_user.username[0]|upper }}</span>
-            <span class="profile-info">
-                <span class="username">Logout</span>
-            </span>
+            <span class="profile-info"><span class="username">Logout</span></span>
         </button>
     </div>
 
-    <main class="container">
-        <section class="header-section">
+    <main class="container dashboard-shell">
+        <section class="header-section dashboard-hero">
             <div class="header-copy">
-                <p class="eyebrow">Forensic Analytics</p>
+                <p class="eyebrow">Live Forensic Analytics</p>
                 <h1 id="dashboard-title">Intelligence Dashboard</h1>
-                <p class="guide">Real-time visualization of job fraud patterns and detection metrics.</p>
+                <p class="guide">SQLite-backed scan history, risk trends, and detection breakdowns.</p>
+            </div>
+            <div class="dashboard-hero-score">
+                <span>{{ stats.avg_risk }}%</span>
+                <small>average risk</small>
             </div>
         </section>
 
-        <div class="stats-summary">
-            <div class="stat-card">
-                <span class="stat-value">{{ stats.total_scans }}</span>
-                <span class="stat-label">Total Scans</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value">{{ stats.avg_risk }}%</span>
-                <span class="stat-label">Avg Risk Score</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-value">{{ stats.avg_confidence }}%</span>
-                <span class="stat-label">Avg Confidence</span>
-            </div>
+        <div class="stats-summary dashboard-summary">
+            <div class="stat-card metric-primary"><span class="stat-value">{{ stats.total_scans }}</span><span class="stat-label">Total Scans</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.scans_this_week }}</span><span class="stat-label">This Week</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.safe_jobs }}</span><span class="stat-label">Safe Jobs</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.suspicious_jobs }}</span><span class="stat-label">Suspicious</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.fake_jobs }}</span><span class="stat-label">Fake Jobs</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.recent_detections }}</span><span class="stat-label">Recent Detections</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.ocr_scans }}</span><span class="stat-label">OCR Scans</span></div>
+            <div class="stat-card"><span class="stat-value">{{ stats.url_scans }}</span><span class="stat-label">URL Scans</span></div>
         </div>
 
-        <div class="dashboard-grid">
-            <!-- Risk Distribution -->
-            <div class="chart-card">
-                <h3><span aria-hidden="true">&#128680;</span> Risk Breakdown</h3>
-                <canvas id="riskChart"></canvas>
-            </div>
-
-            <!-- Activity Timeline -->
-            <div class="chart-card">
-                <h3><span aria-hidden="true">&#128200;</span> Activity (Last 7 Days)</h3>
+        <div class="dashboard-grid premium-dashboard-grid">
+            <div class="chart-card chart-wide">
+                <h3>Scam Detection Trend</h3>
                 <canvas id="activityChart"></canvas>
             </div>
-
-            <!-- Engine Distribution -->
             <div class="chart-card">
-                <h3><span aria-hidden="true">&#129302;</span> Detection Engines</h3>
+                <h3>Risk Score Distribution</h3>
+                <canvas id="riskBandChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Verdict Breakdown</h3>
+                <canvas id="riskChart"></canvas>
+            </div>
+            <div class="chart-card chart-wide">
+                <h3>Category Distribution</h3>
+                <canvas id="categoryChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <h3>Detection Engines</h3>
                 <canvas id="engineChart"></canvas>
+            </div>
+            <div class="chart-card recent-activity-card">
+                <h3>Recent Activity</h3>
+                <div class="activity-list">
+                    {% for item in stats.recent_activity %}
+                    <div class="activity-row">
+                        <span class="prediction-badge {{ item.prediction|lower }}">{{ item.prediction }}</span>
+                        <span class="activity-text">{{ item.input_text }}</span>
+                        <strong>{{ item.risk }}/100</strong>
+                    </div>
+                    {% else %}
+                    <p class="guide">No scans recorded yet.</p>
+                    {% endfor %}
+                </div>
             </div>
         </div>
 
-        <div class="action-buttons" style="margin-top: 48px;">
-            <button type="button" onclick="location.href='/'" class="btn-secondary">
-                <span aria-hidden="true">&larr;</span>
-                <span>Back to Analysis</span>
-            </button>
-            <button type="button" onclick="location.href='/history'" class="btn-secondary">
-                <span aria-hidden="true">&#128203;</span>
-                <span>View Full History</span>
-            </button>
+        <div class="action-buttons dashboard-actions">
+            <button type="button" onclick="location.href='/'" class="btn-secondary"><span>&larr;</span><span>Back to Analysis</span></button>
+            <button type="button" onclick="location.href='/history'" class="btn-secondary"><span>&#128203;</span><span>View Full History</span></button>
         </div>
     </main>
 
     <script>
-        // Chart.js Default Config for Dark Theme
-        Chart.defaults.color = '#b3b8c2';
-        Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.1)';
-        Chart.defaults.font.family = "'Outfit', sans-serif";
+        Chart.defaults.color = '#334155';
+        Chart.defaults.borderColor = 'rgba(15,23,42,0.08)';
+        Chart.defaults.font.family = "'Inter', sans-serif";
 
         const stats = {{ stats|tojson }};
+        const glassGrid = { color: 'rgba(15,23,42,0.06)', drawBorder: false };
 
-        // 1. Risk Chart
-        new Chart(document.getElementById('riskChart'), {
-            type: 'pie',
-            data: {
-                labels: Object.keys(stats.risk_counts),
-                datasets: [{
-                    data: Object.values(stats.risk_counts),
-                    backgroundColor: ['#ef4444', '#f59e0b', '#10a37f'],
-                    borderWidth: 0
-                }]
-            },
-            options: {
+        function gradient(ctx, top, bottom) {
+            const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height || 260);
+            g.addColorStop(0, top);
+            g.addColorStop(1, bottom);
+            return g;
+        }
+
+        function chartOptions(extra = {}) {
+            return {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
-                    legend: { position: 'bottom' }
-                }
-            }
-        });
+                    legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 18 } },
+                    tooltip: {
+                        backgroundColor: 'rgba(255,255,255,0.92)',
+                        titleColor: '#0f172a',
+                        bodyColor: '#334155',
+                        borderColor: 'rgba(15,23,42,0.08)',
+                        borderWidth: 1
+                    }
+                },
+                ...extra
+            };
+        }
 
-        // 2. Activity Chart
         new Chart(document.getElementById('activityChart'), {
             type: 'line',
             data: {
                 labels: Object.keys(stats.timeline_data),
-                datasets: [{
-                    label: 'Scans',
-                    data: Object.values(stats.timeline_data),
-                    borderColor: '#10a37f',
-                    backgroundColor: 'rgba(16, 163, 127, 0.1)',
-                    fill: true,
-                    tension: 0.4
-                }]
+                datasets: [
+                    {
+                        label: 'Scans',
+                        data: Object.values(stats.timeline_data),
+                        borderColor: '#22c55e',
+                        backgroundColor: (ctx) => gradient(ctx, 'rgba(34,197,94,0.22)', 'rgba(34,197,94,0.02)'),
+                        fill: true,
+                        tension: 0.42,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#22c55e'
+                    },
+                    {
+                        label: 'Avg Risk',
+                        data: Object.values(stats.avg_risk_by_day),
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239,68,68,0.08)',
+                        tension: 0.42,
+                        yAxisID: 'risk'
+                    }
+                ]
             },
-            options: {
-                responsive: true,
+            options: chartOptions({
                 scales: {
-                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                    y: { beginAtZero: true, grid: glassGrid, ticks: { precision: 0 } },
+                    risk: { beginAtZero: true, max: 100, position: 'right', grid: { display: false } },
+                    x: { grid: { display: false } }
                 }
-            }
+            })
         });
 
-        // 3. Engine Chart
-        new Chart(document.getElementById('engineChart'), {
-            type: 'doughnut',
+        new Chart(document.getElementById('riskBandChart'), {
+            type: 'bar',
             data: {
-                labels: Object.keys(stats.engine_counts),
+                labels: Object.keys(stats.risk_bands),
                 datasets: [{
-                    data: Object.values(stats.engine_counts),
-                    backgroundColor: ['#10a37f', '#444654'],
-                    borderWidth: 0
+                    label: 'Scans',
+                    data: Object.values(stats.risk_bands),
+                    backgroundColor: ['rgba(34,197,94,0.72)', 'rgba(245,158,11,0.72)', 'rgba(239,68,68,0.72)'],
+                    borderRadius: 14
                 }]
             },
-            options: {
-                responsive: true,
-                plugins: {
-                    legend: { position: 'bottom' }
-                },
-                cutout: '70%'
-            }
+            options: chartOptions({ scales: { y: { beginAtZero: true, grid: glassGrid, ticks: { precision: 0 } }, x: { grid: { display: false } } } })
+        });
+
+        new Chart(document.getElementById('riskChart'), {
+            type: 'doughnut',
+            data: {
+                labels: Object.keys(stats.risk_counts),
+                datasets: [{ data: Object.values(stats.risk_counts), backgroundColor: ['#22c55e', '#f59e0b', '#ef4444', '#94a3b8'], borderWidth: 0 }]
+            },
+            options: chartOptions({ cutout: '68%' })
+        });
+
+        new Chart(document.getElementById('categoryChart'), {
+            type: 'bar',
+            data: {
+                labels: Object.keys(stats.category_counts),
+                datasets: [{ label: 'Scans', data: Object.values(stats.category_counts), backgroundColor: 'rgba(34,197,94,0.62)', borderRadius: 14 }]
+            },
+            options: chartOptions({ indexAxis: 'y', scales: { x: { beginAtZero: true, grid: glassGrid, ticks: { precision: 0 } }, y: { grid: { display: false } } } })
+        });
+
+        new Chart(document.getElementById('engineChart'), {
+            type: 'polarArea',
+            data: {
+                labels: Object.keys(stats.engine_counts),
+                datasets: [{ data: Object.values(stats.engine_counts), backgroundColor: ['rgba(34,197,94,0.65)', 'rgba(59,130,246,0.55)', 'rgba(245,158,11,0.55)', 'rgba(148,163,184,0.5)'], borderWidth: 0 }]
+            },
+            options: chartOptions()
         });
     </script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
